@@ -1,0 +1,19 @@
+{
+  "name": "PAW & DECK — gry karciane",
+  "short_name": "PAW & DECK",
+  "description": "Makao, Kocia Ekipa vs Psy i Remik. Graj z botem, na jednym telefonie albo online ze znajomymi.",
+  "lang": "pl",
+  "id": "./",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#F6F3EC",
+  "theme_color": "#F6F3EC",
+  "categories": ["games", "entertainment"],
+  "icons": [
+    { "src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "icons/icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}

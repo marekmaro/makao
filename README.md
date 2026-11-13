@@ -3,7 +3,7 @@
 Makao, Kocia Ekipa vs Psy i Remik w jednej aplikacji. Trzy sposoby gry: z botem, we dwoje na jednym
 telefonie albo online ze znajomymi (z czatem przy stole).
 
-## Co jest w tym folderze
+## Co jest w repozytorium
 
 | Plik | Do czego służy |
 | --- | --- |
@@ -19,7 +19,7 @@ telefonie albo online ze znajomymi (z czatem przy stole).
 otwartej pod adresem `https://…`. Plik otwarty z dysku (`file://…`) zadziała jako zwykła strona, ale nie da się
 go zainstalować i nie będzie działał offline.
 
-Wystarczy więc raz wrzucić ten folder na dowolny darmowy hosting. Najprościej przez GitHub Pages:
+To repozytorium jest gotowe pod GitHub Pages — wystarczy je włączyć:
 
 1. Na GitHubie wejdź w repozytorium → **Settings → Pages**.
 2. W „Build and deployment” wybierz **Deploy from a branch**, gałąź `main`, folder `/ (root)` i zapisz.
@@ -27,16 +27,16 @@ Wystarczy więc raz wrzucić ten folder na dowolny darmowy hosting. Najprościej
 
 Potem na telefonie:
 
-- **Android (Chrome, Edge, Samsung Internet):** otwórz adres, w menu głównym gry stuknij
-  „Zainstaluj aplikację na telefonie” i potwierdź. Jeśli przycisk nie otwiera okna instalacji:
+- **Android (Chrome, Edge, Samsung Internet):** otwórz adres, w grze stuknij menu ☰ →
+  „Zainstaluj aplikację” i potwierdź. Jeśli przycisk nie otwiera okna instalacji:
   menu przeglądarki ⋮ → „Zainstaluj aplikację” / „Dodaj do ekranu głównego”.
 - **iPhone / iPad:** otwórz adres w **Safari** → Udostępnij → „Do ekranu początkowego” → Dodaj.
 
 Po instalacji gra otwiera się na pełnym ekranie i działa bez internetu (gra z botem i na jednym telefonie).
 Przy pierwszym otwarciu potrzebny jest internet — wtedy pobierają się biblioteki i czcionki.
 
-Inne darmowe hostingi (Netlify Drop, Cloudflare Pages, Firebase Hosting) działają tak samo: wrzucasz cały
-folder `paw-deck`.
+Inne darmowe hostingi (Netlify Drop, Cloudflare Pages, Firebase Hosting) działają tak samo: wrzucasz
+wszystkie pliki z tego repozytorium.
 
 ### Aktualizacja gry
 

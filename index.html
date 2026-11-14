@@ -1511,6 +1511,36 @@
       to { opacity: 1; }
     }
 
+    .hand-sort {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      padding: 0 6px 8px;
+    }
+    .hand-sort-label {
+      font-size: 10px;
+      font-weight: 800;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: #66736E;
+      margin-right: 2px;
+    }
+    .hand-sort-btn {
+      padding: 4px 10px;
+      border-radius: 999px;
+      font-size: 11px;
+      font-weight: 800;
+      color: #0B463C;
+      background: #F6F3EC;
+      border: 1px solid #E2DDD2;
+      transition: background 0.15s ease, color 0.15s ease;
+    }
+    .hand-sort-btn.on {
+      background: #0B463C;
+      color: #FFFFFF;
+      border-color: #0B463C;
+    }
+
     .pile-shadow-card {
       position: absolute;
       inset: 0;
@@ -3874,6 +3904,48 @@
       );
     }
 
+    // Sortowanie ręki: 'suit' – kolor, potem figura; 'rank' – figura, potem kolor; 'none' – kolejność dobierania.
+    const HAND_SORT_KEY = 'asy_wasy_hand_sort_v1';
+    const HAND_SORT_OPTIONS = [
+      { id: 'suit', label: 'Kolor' },
+      { id: 'rank', label: 'Figura' },
+      { id: 'none', label: 'Kolejność' }
+    ];
+    const SUIT_SORT_ORDER = { spades: 0, hearts: 1, clubs: 2, diamonds: 3, joker: 4 };
+
+    function sortHand(cards, mode) {
+      const list = [...(cards || [])];
+      // Kocia Ekipa: karty tuneli i akcji nie mają figur ani kolorów — sortujemy po typie i nazwie.
+      if (list.some(c => c.type)) {
+        if (mode === 'none') return list;
+        return list.sort((a, b) => ((a.type === b.type) ? 0 : (a.type === 'path' ? -1 : 1)) || String(a.name || '').localeCompare(String(b.name || ''), 'pl'));
+      }
+      const rankIdx = c => (c.rank === 'JOKER' ? RANKS.length : RANKS.indexOf(c.rank));
+      const suitIdx = c => (c.suit in SUIT_SORT_ORDER ? SUIT_SORT_ORDER[c.suit] : 9);
+      if (mode === 'suit') return list.sort((a, b) => (suitIdx(a) - suitIdx(b)) || (rankIdx(a) - rankIdx(b)));
+      if (mode === 'rank') return list.sort((a, b) => (rankIdx(a) - rankIdx(b)) || (suitIdx(a) - suitIdx(b)));
+      return list;
+    }
+
+    function HandSortBar({ value, onChange }) {
+      return (
+        <div className="hand-sort" role="group" aria-label="Sortowanie ręki">
+          <span className="hand-sort-label">Sortuj</span>
+          {HAND_SORT_OPTIONS.map(o => (
+            <button
+              key={o.id}
+              type="button"
+              aria-pressed={value === o.id}
+              onClick={() => { SoundFX.draw(); onChange(o.id); }}
+              className={`hand-sort-btn ${value === o.id ? 'on' : ''}`}
+            >
+              {o.label}
+            </button>
+          ))}
+        </div>
+      );
+    }
+
     // Ile miejsca na zachodzenie kart w ręce: karty łapią się w jednym łuku, ale nie wychodzą poza ekran.
     function handOverlap(n) {
       if (n <= 1) return 0;
@@ -4388,7 +4460,13 @@
       const [celebration, setCelebration] = useState(null);
       const [audio, setAudio] = useState(loadAudio);
       const [account, setAccount] = useState(null);      // zalogowany przez Google (null = tryb lokalny)
-      const [dealing, setDealing] = useState(false);     // animacja rozdania przed startem gry
+      const [dealing, setDealing] = useState(false);
+      const [handSort, setHandSort] = useState(() => {
+        try { const v = localStorage.getItem(HAND_SORT_KEY); return HAND_SORT_OPTIONS.some(o => o.id === v) ? v : 'suit'; } catch (e) { return 'suit'; }
+      });
+      useEffect(() => {
+        try { localStorage.setItem(HAND_SORT_KEY, handSort); } catch (e) {}
+      }, [handSort]);     // animacja rozdania przed startem gry
       const progressRef = useRef(progress);
       progressRef.current = progress;
       const historyRef = useRef(history);
@@ -6224,10 +6302,7 @@
                 const ms = room.makao;
                 const rules = room.makaoRules;
                 const topCard = ms.discardPile[ms.discardPile.length - 1];
-                const suitOrder = { spades: 1, hearts: 2, clubs: 3, diamonds: 4, joker: 5 };
-                const myHand = [...(ms.hands[activePlayerId] || [])].sort(
-                  (a, b) => (suitOrder[a.suit] - suitOrder[b.suit]) || RANKS.indexOf(a.rank) - RANKS.indexOf(b.rank)
-                );
+                const myHand = sortHand(ms.hands[activePlayerId] || [], handSort);
                 const turnPlayer = room.players[ms.currentTurnIdx];
                 const isMyTurn = turnPlayer?.id === activePlayerId && room.status === 'playing';
                 const hasPlayable = isMyTurn && myHand.some(c => canPlayMakaoCard(c, ms, rules));
@@ -6390,6 +6465,7 @@
                         </span>
                       </div>
 
+                      <HandSortBar value={handSort} onChange={setHandSort} />
                       <FanHand
                         cards={myHand}
                         renderCard={(card) => {
@@ -6423,7 +6499,7 @@
               ================================================================ */}
               {room.gameType === 'saboteur' && room.saboteur && (() => {
                 const ss = room.saboteur;
-                const myHand = ss.hands[activePlayerId] || [];
+                const myHand = sortHand(ss.hands[activePlayerId] || [], handSort);
                 const myRole = ss.roles[activePlayerId] || 'cat';
                 const isMyTurn = room.players[ss.currentTurnIdx]?.id === activePlayerId && room.status === 'playing';
                 const selectedCard = myHand.find(c => c.id === selectedCardId);
@@ -6546,6 +6622,7 @@
                         </div>
                       </div>
 
+                      <HandSortBar value={handSort} onChange={setHandSort} />
                       <div className="hand-fan" style={{ '--card-overlap': '6px' }}>
                         {myHand.map(card => (
                           <SaboteurCardView
@@ -6597,7 +6674,7 @@
               ================================================================ */}
               {room.gameType === 'rummy' && room.rummy && (() => {
                 const rs = room.rummy;
-                const myHand = rs.hands[activePlayerId] || [];
+                const myHand = sortHand(rs.hands[activePlayerId] || [], handSort);
                 const topDiscard = rs.discardPile[rs.discardPile.length - 1];
                 const isMyTurn = room.players[rs.currentTurnIdx]?.id === activePlayerId && room.status === 'playing';
                 const selectedCards = myHand.filter(c => rummySelectedIds.includes(c.id));
@@ -6700,6 +6777,7 @@
                           </button>
                         )}
                       </div>
+                      <HandSortBar value={handSort} onChange={setHandSort} />
                       <FanHand
                         cards={myHand}
                         renderCard={(card) => (

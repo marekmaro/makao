@@ -41,7 +41,7 @@ wszystkie pliki z tego repozytorium.
 
 ### Aktualizacja gry
 
-Po każdej zmianie plików podbij numer w `sw.js` (`const VERSION = 'paw-deck-v5.2.0'`). Telefony pobiorą
+Po każdej zmianie plików podbij numer w `sw.js` (`const VERSION = 'paw-deck-v5.3.0'`). Telefony pobiorą
 nową wersję przy następnym otwarciu aplikacji z internetem.
 
 ## Gra online i czat (Firebase)
@@ -107,6 +107,16 @@ Domyślny tryb dla 2 graczy, wzorowany na zasadach pojedynkowych wariantów gier
   rundy zaczynają na zmianę.
 
 Uproszczenia względem planszowego pierwowzoru: nie ma drzwi i kluczy, trolli, mostów ani złota na kartach tuneli.
+
+## Statystyki, poziomy botów, tytuły
+
+- **Statystyki** (partie, wygrane, seria, myszy, wynik w każdej grze) zapisują się w przeglądarce po każdej rundzie.
+  Partie przy jednym telefonie się nie liczą.
+- **Poziom botów** (Łatwy / Normalny / Trudny) w profilu: łatwe boty częściej grają słabiej i przegapiają STOP MAKAO,
+  trudne grają najlepiej i szybciej.
+- **Tytuły** odblokowują się grą (np. 3 wygrane w Makao, seria 3 wygranych, pojedynek o myszy wygrany).
+- **Kolor stołu** zmienia wygląd stołu tylko u Ciebie. Ramki i awatary wybierasz w profilu.
+- Wygrana kończy się konfetti i trofeum.
 
 ## Znane ograniczenia
 

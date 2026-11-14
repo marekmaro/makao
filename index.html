@@ -148,8 +148,8 @@
     }
 
     .emerald-table {
-      background: radial-gradient(circle at 50% 35%, #165249 0%, var(--emerald-felt) 65%, var(--emerald-deep) 100%);
-      border: 2.5px solid #0A2924;
+      background: radial-gradient(circle at 50% 35%, var(--felt-a, #165249) 0%, var(--felt-b, var(--emerald-felt)) 65%, var(--felt-c, var(--emerald-deep)) 100%);
+      border: 2.5px solid var(--felt-edge, #0A2924);
       border-radius: 26px;
       box-shadow: 0 6px 0 #0A2924, inset 0 2px 0 rgba(255,255,255,0.12);
       color: #F7F5F0;
@@ -810,6 +810,40 @@
       80% { translate: 4px 0; }
     }
 
+    .confetti-layer {
+      position: fixed;
+      inset: 0;
+      z-index: 58;
+      pointer-events: none;
+      overflow: hidden;
+    }
+    .confetti-piece {
+      position: absolute;
+      top: -24px;
+      border-radius: 2px;
+      opacity: 0;
+      animation-name: confettiFall;
+      animation-timing-function: cubic-bezier(.2,.6,.3,1);
+      animation-fill-mode: forwards;
+    }
+    .confetti-piece.round {
+      border-radius: 50%;
+    }
+    @keyframes confettiFall {
+      0% { opacity: 1; transform: translate(0, 0) rotate(0deg); }
+      85% { opacity: 1; }
+      100% { opacity: 0; transform: translate(var(--drift), 112vh) rotate(var(--spin)); }
+    }
+    .trophy-bounce {
+      animation: trophyBounce 0.9s cubic-bezier(.22,1,.36,1) 2;
+    }
+    @keyframes trophyBounce {
+      0% { transform: scale(0.3) rotate(-12deg); }
+      55% { transform: scale(1.25) rotate(6deg); }
+      80% { transform: scale(0.95) rotate(-3deg); }
+      100% { transform: scale(1) rotate(0); }
+    }
+
     .pile-shadow-card {
       position: absolute;
       inset: 0;
@@ -1050,13 +1084,115 @@
       gold: { name: 'Złoto', color: '#D99B26' },
       teal: { name: 'Mięta', color: '#0D9488' },
       indigo: { name: 'Kobalt', color: '#4338CA' },
-      plum: { name: 'Śliwka', color: '#7E22CE' }
+      plum: { name: 'Śliwka', color: '#7E22CE' },
+      ruby: { name: 'Rubin', color: '#BE123C' },
+      sky: { name: 'Niebo', color: '#0284C7' },
+      lime: { name: 'Limonka', color: '#65A30D' },
+      obsidian: { name: 'Obsydian', color: '#111827' },
+      pearl: { name: 'Perła', color: '#94A3B8' },
+      sun: { name: 'Słońce', color: '#F59E0B' }
     };
 
+    // Tytuły odblokowują się grą (statystyki z localStorage).
     const PLAYER_TITLES = [
-      'Mistrz Makao', 'Łowca Myszy', 'Król Remika', 'Nocny Gracz',
-      'Koci Strateg', 'As w Rękawie', 'Szef Dachów', 'Krupier VIP'
+      { name: 'Nowicjusz', hint: 'na start', need: () => true },
+      { name: 'Nocny Gracz', hint: '5 partii', need: p => p.played >= 5 },
+      { name: 'Mistrz Makao', hint: '3 wygrane w Makao', need: p => p.games.makao.won >= 3 },
+      { name: 'Król Remika', hint: '3 wygrane w Remiku', need: p => p.games.rummy.won >= 3 },
+      { name: 'Łowca Myszy', hint: '8 myszy w Kociej Ekipie', need: p => p.mice >= 8 },
+      { name: 'Koci Strateg', hint: 'seria 3 wygranych', need: p => p.bestStreak >= 3 },
+      { name: 'Szef Dachów', hint: 'pojedynek o myszy wygrany', need: p => p.duelWins >= 1 },
+      { name: 'As w Rękawie', hint: '10 wygranych', need: p => p.won >= 10 },
+      { name: 'Krupier VIP', hint: '25 partii', need: p => p.played >= 25 }
     ];
+
+    const TABLE_THEMES = {
+      emerald: { name: 'Szmaragd', a: '#165249', b: '#0B463C', c: '#062923', edge: '#0A2924' },
+      navy: { name: 'Granat', a: '#1F4068', b: '#15304F', c: '#0A1A2F', edge: '#081426' },
+      burgundy: { name: 'Bordo', a: '#7A2233', b: '#5B1322', c: '#33091A', edge: '#260610' },
+      slate: { name: 'Grafit', a: '#4A5568', b: '#2D3748', c: '#171E29', edge: '#101620' }
+    };
+
+    // Poziomy botów: mistake = szansa na słabszy ruch, pace = tempo (ms), catchChance = czujność na STOP MAKAO.
+    const BOT_LEVELS = {
+      easy: { label: 'Łatwy', mistake: 0.45, catchChance: 0.5, pace: 1500, desc: 'Boty często grają byle jaką kartę i czasem przegapiają STOP MAKAO.' },
+      normal: { label: 'Normalny', mistake: 0.12, catchChance: 1, pace: 950, desc: 'Zrównoważone boty: czasem popełnią błąd, rzadko przegapią okazję.' },
+      hard: { label: 'Trudny', mistake: 0, catchChance: 1, pace: 650, desc: 'Najlepsze ruchy, szybkie tempo i zawsze czujne ucho na MAKAO.' }
+    };
+
+    const PROGRESS_KEY = 'asy_wasy_progress_v1';
+    const DIFFICULTY_KEY = 'asy_wasy_difficulty_v1';
+    const TABLE_KEY = 'asy_wasy_table_v1';
+
+    const PROGRESS_DEFAULT = {
+      played: 0, won: 0, streak: 0, bestStreak: 0, mice: 0, duelMatches: 0, duelWins: 0,
+      games: { makao: { played: 0, won: 0 }, saboteur: { played: 0, won: 0 }, rummy: { played: 0, won: 0 } }
+    };
+
+    function loadProgress() {
+      try {
+        const raw = localStorage.getItem(PROGRESS_KEY);
+        if (raw) {
+          const p = JSON.parse(raw);
+          return { ...PROGRESS_DEFAULT, ...p, games: { ...PROGRESS_DEFAULT.games, ...(p.games || {}) } };
+        }
+      } catch (e) {}
+      return JSON.parse(JSON.stringify(PROGRESS_DEFAULT));
+    }
+
+    function saveProgress(p) {
+      try { localStorage.setItem(PROGRESS_KEY, JSON.stringify(p)); } catch (e) {}
+    }
+
+    // Wynik rundy z perspektywy gracza: win / loss / draw, albo null gdy to nie jest pełna partia.
+    function roundResult(room, playerId) {
+      const info = room.winnerInfo || {};
+      const game = room.gameType;
+      if (game === 'saboteur' && room.saboteur) {
+        const ss = room.saboteur;
+        const mice = (ss.mice && ss.mice[playerId]) || 0;
+        if (ss.duelVariant === 'duel') {
+          const done = Boolean(info.matchOver);
+          const won = done && info.winnerId === playerId;
+          return {
+            game, mice, countsAsGame: done, duelMatch: done, duelWin: won,
+            result: !done ? null : won ? 'win' : info.winnerId ? 'loss' : 'draw'
+          };
+        }
+        const name = info.winnerName || '';
+        const role = ss.roles ? ss.roles[playerId] : null;
+        let result = 'draw';
+        if (/Kocia/.test(name)) result = role === 'cat' ? 'win' : 'loss';
+        else if (/Psy/.test(name)) result = role === 'dog' ? 'win' : 'loss';
+        return { game, mice: 0, countsAsGame: true, duelMatch: false, duelWin: false, result };
+      }
+      return {
+        game, mice: 0, countsAsGame: true, duelMatch: false, duelWin: false,
+        result: info.winnerId === playerId ? 'win' : info.winnerId ? 'loss' : 'draw'
+      };
+    }
+
+    function recordResult(prev, r) {
+      const next = { ...prev, games: { ...prev.games }, mice: prev.mice + (r.mice || 0) };
+      if (r.duelMatch) {
+        next.duelMatches += 1;
+        if (r.duelWin) next.duelWins += 1;
+      }
+      if (r.countsAsGame && r.result) {
+        const g = next.games[r.game] || { played: 0, won: 0 };
+        next.games[r.game] = { played: g.played + 1, won: g.won + (r.result === 'win' ? 1 : 0) };
+        next.played += 1;
+        if (r.result === 'win') {
+          next.won += 1;
+          next.streak += 1;
+          next.bestStreak = Math.max(next.bestStreak, next.streak);
+        } else if (r.result === 'loss') {
+          next.streak = 0;
+        }
+      }
+      saveProgress(next);
+      return next;
+    }
 
     const COOL_NICKS = [
       'CzarnyKocur', 'AsPik', 'ZłotyPazur', 'KrólowaDachów', 'SprytnyLis',
@@ -3169,6 +3305,42 @@
     // =========================================================================
     const SESSION_STORAGE_KEY = 'paw_deck_active_session_v1';
 
+    function Confetti({ seed }) {
+      const pieces = useMemo(() => {
+        const colors = ['#E84A3A', '#D99B26', '#0B463C', '#34D399', '#60A5FA', '#F472B6', '#FFFDF8', '#A78BFA'];
+        return Array.from({ length: 80 }, (_, i) => ({
+          left: Math.random() * 100,
+          delay: Math.random() * 0.7,
+          dur: 2.4 + Math.random() * 1.6,
+          size: 6 + Math.random() * 7,
+          color: colors[i % colors.length],
+          round: i % 3 === 0,
+          drift: (Math.random() - 0.5) * 180,
+          spin: 360 + Math.random() * 720
+        }));
+      }, [seed]);
+      return (
+        <div className="confetti-layer" aria-hidden="true">
+          {pieces.map((p, i) => (
+            <span
+              key={i}
+              className={`confetti-piece ${p.round ? 'round' : ''}`}
+              style={{
+                left: `${p.left}%`,
+                width: p.size,
+                height: p.round ? p.size : p.size * 1.6,
+                background: p.color,
+                animationDelay: `${p.delay}s`,
+                animationDuration: `${p.dur}s`,
+                '--drift': `${p.drift}px`,
+                '--spin': `${p.spin}deg`
+              }}
+            />
+          ))}
+        </div>
+      );
+    }
+
     function App() {
       const [fbReady, setFbReady] = useState(false);
       const [fbStatus, setFbStatus] = useState('connecting');
@@ -3205,7 +3377,7 @@
       });
 
       const [playerTitle, setPlayerTitle] = useState(() => {
-        try { return localStorage.getItem('paw_deck_title') || 'Mistrz Makao'; } catch (e) { return 'Mistrz Makao'; }
+        try { return localStorage.getItem('paw_deck_title') || 'Nowicjusz'; } catch (e) { return 'Mistrz Makao'; }
       });
 
       const [muted, setMuted] = useState(() => {
@@ -3242,6 +3414,20 @@
       const [friendsOpen, setFriendsOpen] = useState(false);
       const swipeStartX = useRef(null);
       const [menuOpen, setMenuOpen] = useState(false);
+      const [progress, setProgress] = useState(loadProgress);
+      const [botLevel, setBotLevel] = useState(() => {
+        try { const v = localStorage.getItem(DIFFICULTY_KEY); return BOT_LEVELS[v] ? v : 'normal'; } catch (e) { return 'normal'; }
+      });
+      const [tableId, setTableId] = useState(() => {
+        try { const v = localStorage.getItem(TABLE_KEY); return TABLE_THEMES[v] ? v : 'emerald'; } catch (e) { return 'emerald'; }
+      });
+      const [celebration, setCelebration] = useState(null);
+      // Tytuł można nosić tylko odblokowany; w razie czego wraca się do „Nowicjusza”.
+      useEffect(() => {
+        const t = PLAYER_TITLES.find(x => x.name === playerTitle);
+        if (!t || !t.need(progress)) setPlayerTitle('Nowicjusz');
+      }, [progress]);
+      const finishKeyRef = useRef(null);
       const [leaveConfirmOpen, setLeaveConfirmOpen] = useState(false);
       const [qrModalOpen, setQrModalOpen] = useState(false);
       const [chatOpen, setChatOpen] = useState(false);
@@ -3434,6 +3620,29 @@
         const giveUp = setTimeout(() => setFbStatus(st => (st === 'connecting' ? 'offline' : st)), 8000);
         return () => clearTimeout(giveUp);
       }, []);
+
+      useEffect(() => {
+        try {
+          localStorage.setItem(DIFFICULTY_KEY, botLevel);
+          localStorage.setItem(TABLE_KEY, tableId);
+        } catch (e) {}
+      }, [botLevel, tableId]);
+
+      // Statystyki i świętowanie: raz na zakończoną rundę (partie przy jednym telefonie się nie liczą).
+      useEffect(() => {
+        if (!room || room.status !== 'finished' || !room.winnerInfo) return;
+        const key = `${room.code}|${room.round}|${room.gameType}|${room.winnerInfo.winnerName}|${room.winnerInfo.reason}`;
+        if (finishKeyRef.current === key) return;
+        finishKeyRef.current = key;
+        if (room.isPassAndPlay) return;
+        const r = roundResult(room, playerId);
+        setProgress(prev => recordResult(prev, r));
+        if (r.result === 'win') {
+          setCelebration({ id: Date.now() });
+          const t = setTimeout(() => setCelebration(null), 4200);
+          return () => clearTimeout(t);
+        }
+      }, [room?.status, room?.winnerInfo, room?.round]);
 
       // Live Clock for Makao Turn Timer
       useEffect(() => {
@@ -4198,19 +4407,28 @@
         if (curr.gameType === 'makao') {
           // Najpierw bot sprawdza, czy ktoś zapomniał krzyknąć „MAKAO!”.
           const sleepy = makaoCatchTargets(curr.players, gState, curr.makaoRules, turnPlayer.id).filter(p => !p.isBot)[0];
-          if (sleepy) {
+          if (sleepy && Math.random() < BOT_LEVELS[botLevel].catchChance) {
             handleCatchMakao(sleepy.id, turnPlayer.id);
             return;
           }
-          const move = chooseMakaoBotMove(curr.players, gState, curr.makaoRules, turnPlayer.id);
+          let move = chooseMakaoBotMove(curr.players, gState, curr.makaoRules, turnPlayer.id);
+          const playable = (gState.hands[turnPlayer.id] || []).filter(c => canPlayMakaoCard(c, gState, curr.makaoRules));
+          if (playable.length > 0 && Math.random() < BOT_LEVELS[botLevel].mistake) {
+            // Słabszy ruch: losowa grywalna karta, bez żądań.
+            move = { type: 'play', cardIds: [playable[Math.floor(Math.random() * playable.length)].id], demand: null };
+          }
           if (move.type === 'play') executeMakaoPlayCard(turnPlayer.id, move.cardIds, move.demand);
           else executeMakaoDrawOrPass(turnPlayer.id);
           return;
         }
 
         if (curr.gameType === 'saboteur') {
-          const move = chooseSabBotMove(curr, turnPlayer.id);
+          let move = chooseSabBotMove(curr, turnPlayer.id);
           if (!move) return;
+          const sh = gState.hands[turnPlayer.id] || [];
+          if (move.type !== 'discard' && sh.length > 0 && Math.random() < BOT_LEVELS[botLevel].mistake) {
+            move = { type: 'discard', cardId: sh[Math.floor(Math.random() * sh.length)].id };
+          }
           if (move.type === 'heal') {
             executeSabHeal(turnPlayer.id, move.cardIds);
             return;
@@ -4224,7 +4442,11 @@
         }
 
         if (curr.gameType === 'rummy') {
-          const move = chooseRummyBotMove(curr, turnPlayer.id);
+          let move = chooseRummyBotMove(curr, turnPlayer.id);
+          const rh = gState.hands[turnPlayer.id] || [];
+          if (move.type === 'discard' && rh.length > 0 && Math.random() < BOT_LEVELS[botLevel].mistake) {
+            move = { type: 'discard', cardId: rh[Math.floor(Math.random() * rh.length)].id };
+          }
           if (move.type === 'draw') executeRummyDraw(turnPlayer.id, move.fromDiscard);
           else if (move.type === 'meld') executeRummyMeld(turnPlayer.id, move.cardIds);
           else executeRummyDiscard(turnPlayer.id, move.cardId);
@@ -4245,13 +4467,13 @@
         // Gracz z jedną kartą bez okrzyku dostaje chwilę na kliknięcie „MAKAO!”, zanim bot go przyłapie.
         const graceForMakao = room.gameType === 'makao' &&
           makaoCatchTargets(room.players, room.makao, room.makaoRules, turnPlayer.id).some(p => !p.isBot);
-        const timer = setTimeout(botStepTrigger, graceForMakao ? 2600 : 950);
+        const timer = setTimeout(botStepTrigger, graceForMakao ? 2600 : BOT_LEVELS[botLevel].pace);
         const watchdog = setInterval(botStepTrigger, 4000);
         return () => {
           clearTimeout(timer);
           clearInterval(watchdog);
         };
-      }, [screen, room?.version, room?.status, botStepTrigger]);
+      }, [screen, room?.version, room?.status, botStepTrigger, botLevel]);
 
       // Efekty wiadomości widoczne przy stole: dymek przy graczu, wybuch emotek, trafienie „pociskiem”.
       const showMessageEffects = (msg) => {
@@ -4473,7 +4695,7 @@
       ];
 
       return (
-        <div className="app-shell min-h-dvh flex flex-col max-w-2xl mx-auto px-3 sm:px-5">
+        <div className="app-shell min-h-dvh flex flex-col max-w-2xl mx-auto px-3 sm:px-5" style={{ "--felt-a": TABLE_THEMES[tableId].a, "--felt-b": TABLE_THEMES[tableId].b, "--felt-c": TABLE_THEMES[tableId].c, "--felt-edge": TABLE_THEMES[tableId].edge }}>
           {/* Toast Notification */}
           {toast && (
             <div className="fixed top-3 inset-x-0 z-[60] flex justify-center px-3 pointer-events-none">
@@ -5552,11 +5774,18 @@
           {screen === 'game' && room?.status === 'finished' && room.winnerInfo && (
             <div className="fixed inset-0 z-50 bg-black/55 flex items-center justify-center p-4">
               <div className="bento-card p-6 max-w-sm w-full text-center space-y-4">
-                <div className="text-5xl">🏆</div>
+                <div className={`text-5xl ${!room.isPassAndPlay && roundResult(room, playerId).result === 'win' ? 'trophy-bounce' : ''}`}>
+                  {!room.isPassAndPlay && roundResult(room, playerId).result === 'win' ? '🏆' : room.isPassAndPlay || roundResult(room, playerId).result === null ? '🏁' : roundResult(room, playerId).result === 'draw' ? '🤝' : '🥈'}
+                </div>
                 <div>
                   <span className="text-xs font-extrabold uppercase tracking-wider text-[#D99B26]">{room.winnerInfo.matchOver ? 'Koniec meczu!' : 'Koniec rundy!'}</span>
-                  <h2 className="text-2xl font-black text-[#18221F] mt-1">{room.winnerInfo.winnerName}</h2>
+                  <h2 className="text-2xl font-black text-[#18221F] mt-1">{!room.isPassAndPlay && roundResult(room, playerId).result === 'win' ? 'Wygrywasz!' : room.winnerInfo.winnerName}</h2>
                   <p className="text-xs text-[#66736E] mt-1">{room.winnerInfo.reason}</p>
+                  {!room.isPassAndPlay && roundResult(room, playerId).result === 'win' && (
+                    <p className="mt-2 inline-block text-[11px] font-black px-2.5 py-1 rounded-full bg-[#FEF3C7] text-[#92400E]">
+                      🔥 Seria: {progress.streak} • Wygrane: {progress.won} • {room.winnerInfo.winnerName}
+                    </p>
+                  )}
                 </div>
 
                 <div className="space-y-1.5 bg-[#F7F5F0] p-3 rounded-2xl border border-[#E5E2DC]">
@@ -5613,19 +5842,13 @@
                         🎲
                       </button>
                     </div>
-                    <select
-                      value={playerTitle}
-                      onChange={e => setPlayerTitle(e.target.value)}
-                      className="w-full px-2.5 py-1 rounded-xl bg-white border border-[#E5E2DC] text-xs font-bold text-[#66736E]"
-                    >
-                      {PLAYER_TITLES.map(t => <option key={t} value={t}>{t}</option>)}
-                    </select>
+                    <span className="block text-[11px] font-extrabold text-[#0B463C] px-1">🏷️ {playerTitle}</span>
                   </div>
                 </div>
 
                 <div>
                   <span className="text-xs font-extrabold text-[#66736E] block mb-2">Kolor ramki</span>
-                  <div className="flex gap-2">
+                  <div className="flex flex-wrap gap-2">
                     {Object.entries(AVATAR_FRAMES).map(([id, fr]) => (
                       <button
                         key={id}
@@ -5653,6 +5876,85 @@
                       </button>
                     ))}
                   </div>
+                </div>
+
+                <div>
+                  <span className="text-xs font-extrabold text-[#66736E] block mb-2">Tytuł (odblokowujesz go grą)</span>
+                  <div className="grid grid-cols-2 gap-1.5">
+                    {PLAYER_TITLES.map(t => {
+                      const open = t.need(progress);
+                      const active = playerTitle === t.name;
+                      return (
+                        <button
+                          key={t.name}
+                          disabled={!open}
+                          onClick={() => setPlayerTitle(t.name)}
+                          className={`text-left px-2.5 py-2 rounded-xl border ${active ? 'bg-[#0F3D36] text-white border-[#0F3D36]' : 'bg-white border-[#E5E2DC] text-[#18221F]'} ${open ? '' : 'opacity-55'}`}
+                        >
+                          <span className="block text-[11px] font-extrabold truncate">{open ? '' : '🔒 '}{t.name}</span>
+                          <span className={`block text-[9px] font-semibold ${active ? 'text-[#CBE0DA]' : 'text-[#66736E]'}`}>{open ? (active ? 'wybrany' : 'odblokowany') : t.hint}</span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                <div>
+                  <span className="text-xs font-extrabold text-[#66736E] block mb-2">Kolor stołu (tylko u Ciebie)</span>
+                  <div className="grid grid-cols-4 gap-2">
+                    {Object.entries(TABLE_THEMES).map(([id, th]) => (
+                      <button key={id} onClick={() => setTableId(id)} className={`rounded-2xl p-1.5 border-2 ${tableId === id ? 'border-[#18221F]' : 'border-transparent'}`}>
+                        <span className="block h-10 rounded-xl" style={{ background: `radial-gradient(circle at 50% 35%, ${th.a}, ${th.b} 65%, ${th.c})` }} />
+                        <span className="block text-[10px] font-bold text-[#18221F] mt-1">{th.name}</span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                <div>
+                  <span className="text-xs font-extrabold text-[#66736E] block mb-2">Poziom botów</span>
+                  <div className="grid grid-cols-3 gap-1.5">
+                    {Object.entries(BOT_LEVELS).map(([id, lv]) => (
+                      <button key={id} onClick={() => setBotLevel(id)} className={`py-2 rounded-xl text-xs font-extrabold border ${botLevel === id ? 'bg-[#0F3D36] text-white border-[#0F3D36]' : 'bg-white border-[#E5E2DC] text-[#18221F]'}`}>
+                        {lv.label}
+                      </button>
+                    ))}
+                  </div>
+                  <p className="text-[10px] text-[#66736E] font-semibold mt-1.5">{BOT_LEVELS[botLevel].desc}</p>
+                </div>
+
+                <div>
+                  <span className="text-xs font-extrabold text-[#66736E] block mb-2">Statystyki</span>
+                  <div className="grid grid-cols-3 gap-1.5">
+                    {[
+                      ['Partie', progress.played],
+                      ['Wygrane', progress.won],
+                      ['Skuteczność', progress.played ? `${Math.round(100 * progress.won / progress.played)}%` : '–'],
+                      ['Seria', progress.streak],
+                      ['Najlepsza seria', progress.bestStreak],
+                      ['Myszy', progress.mice]
+                    ].map(([label, value]) => (
+                      <div key={label} className="p-2 rounded-xl bg-[#F7F5F0] border border-[#E5E2DC] text-center">
+                        <div className="font-mono-code text-lg font-black text-[#0F3D36]">{value}</div>
+                        <div className="text-[9px] font-bold uppercase tracking-wide text-[#66736E]">{label}</div>
+                      </div>
+                    ))}
+                  </div>
+                  <div className="mt-2.5 space-y-1.5">
+                    {[['makao', '🃏 Makao'], ['saboteur', '🐱 Kocia Ekipa'], ['rummy', '♠️ Remik']].map(([id, label]) => {
+                      const g = progress.games[id];
+                      const pct = g.played ? Math.round(100 * g.won / g.played) : 0;
+                      return (
+                        <div key={id} className="text-[11px] font-bold text-[#18221F]">
+                          <div className="flex justify-between"><span>{label}</span><span>{g.won} / {g.played}</span></div>
+                          <div className="h-1.5 rounded-full bg-[#E5E2DC] overflow-hidden mt-0.5"><div className="h-full bg-[#0B463C] rounded-full" style={{ width: `${pct}%` }} /></div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                  {progress.duelMatches > 0 && (
+                    <p className="text-[10px] font-semibold text-[#66736E] mt-1.5">Pojedynki o myszy: wygrane {progress.duelWins} z {progress.duelMatches}</p>
+                  )}
                 </div>
 
                 <button onClick={() => setProfileOpen(false)} className="tactile-btn btn-emerald w-full py-3 text-sm">
@@ -6107,6 +6409,8 @@
               </div>
             );
           })()}
+
+          {celebration && <Confetti seed={celebration.id} />}
 
           {/* Wybuchy emotek nad stołem */}
           {bursts.map(b => (

@@ -46,6 +46,15 @@ t('chains: same rank in any suit, or neighbouring rank in the same suit (the 5�
   assert(!E.chainValid([c('5', 'spades'), c('6', 'hearts')], R), 'neighbouring rank needs the same suit');
 });
 
+t('queens only chain like other cards: Q♦ with K♥ is not one move, Q♦ with Q♣ is', () => {
+  assert(!E.chainValid([c('Q', 'diamonds'), c('K', 'hearts')], R), 'queen cannot link to a king of another suit');
+  assert(!E.chainValid([c('Q', 'diamonds'), c('9', 'clubs')], R));
+  assert(E.chainValid([c('Q', 'diamonds'), c('Q', 'clubs')], R), 'same rank is fine');
+  assert(E.chainValid([c('J', 'diamonds'), c('Q', 'diamonds'), c('K', 'diamonds')], R), 'neighbours in the same suit');
+  // ale dama nadal kładzie się na dowolną kartę jako pierwsza
+  assert(E.canPlayMakaoCard(c('Q', 'clubs'), base(pl2, c('2', 'hearts'), {}), R), 'queen still answers any card');
+});
+
 t('play three cards of one rank in one move (the bug reported by the user)', () => {
   const hand = [c('7', 'hearts', 'a'), c('7', 'spades', 'b'), c('7', 'clubs', 'd'), c('9', 'diamonds', 'e')];
   const st = base(pl2, c('7', 'diamonds'), { p0: hand, p1: [c('5', 'clubs')] });

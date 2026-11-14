@@ -2411,10 +2411,9 @@
     }
 
     // Dwie karty mogą stać obok siebie w ciągu: ta sama figura, albo sąsiednia figura w tym samym kolorze.
-    // „Dama na wszystko” pozwala połączyć damę z każdą kartą.
+    // „Dama na wszystko” dotyczy tylko kładzenia karty na stół (pierwsza karta), nie łączenia w ciągu.
     function makaoLinked(a, b, rules) {
       if (!a || !b || a.rank === 'JOKER' || b.rank === 'JOKER') return false;
-      if (rules.queenAll && (a.rank === 'Q' || b.rank === 'Q')) return true;
       if (a.rank === b.rank) return true;
       const ia = MAKAO_ORDER.indexOf(a.rank);
       const ib = MAKAO_ORDER.indexOf(b.rank);

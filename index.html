@@ -2784,6 +2784,33 @@
       };
     }
 
+    // Najdłuższy ciąg, jaki da się zagrać z tej ręki (zachłannie) — służy do pokazania przycisku MAKAO.
+    function makaoLongestChain(ms, rules, hand) {
+      let best = 0;
+      const starts = [];
+      hand.forEach(c => {
+        if (ms.drawnCardId && c.id !== ms.drawnCardId) return;
+        if (c.rank === 'JOKER') jokerIdentities(c, ms, rules, []).forEach(id => starts.push({ ...id, id: c.id }));
+        else if (canPlayMakaoCard(c, ms, rules)) starts.push(c);
+      });
+      starts.forEach(first => {
+        const chain = [first];
+        const used = new Set([first.id]);
+        let grew = true;
+        while (grew) {
+          grew = false;
+          const cur = chain[chain.length - 1];
+          for (const c of hand) {
+            if (used.has(c.id)) continue;
+            const options = c.rank === 'JOKER' ? jokerIdentities(c, ms, rules, chain) : (makaoLinked(cur, c, rules) ? [c] : []);
+            if (options.length) { chain.push(options[0]); used.add(c.id); grew = true; break; }
+          }
+        }
+        best = Math.max(best, chain.length);
+      });
+      return best;
+    }
+
     // Bot: szuka najdłuższego ciągu do zagrania (zachłannie, od każdej możliwej karty startowej).
     function chooseMakaoBotMove(players, ms, rules, botId) {
       const hand = ms.hands[botId] || [];
@@ -6312,8 +6339,9 @@
                 const pickCards = picking ? (resolveMakaoItems(myHand, pickToItems(makaoPick)) || []) : [];
                 const pickLast = pickCards[pickCards.length - 1] || null;
                 // MAKAO można zapowiedzieć, gdy po tym ruchu może zostać jedna karta.
+                // MAKAO tylko wtedy, gdy ruch może zostawić jedną kartę (przedostatnia karta).
                 const canDeclare = rules.catchMakao && !room.isPassAndPlay && room.status === 'playing' && !ms.saidMakao[activePlayerId] &&
-                  (myHand.length === 1 || (myHand.length <= 3 && hasPlayable));
+                  (myHand.length === 1 || (isMyTurn && myHand.length >= 2 && makaoLongestChain(ms, rules, myHand) >= myHand.length - 1));
                 // Rywale z jedną kartą, którzy nie krzyknęli „MAKAO!” — można im powiedzieć STOP MAKAO.
                 const sleepers = room.status === 'playing' && !room.isPassAndPlay
                   ? makaoCatchTargets(room.players, ms, rules, activePlayerId)

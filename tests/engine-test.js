@@ -7,7 +7,7 @@ const a = html.indexOf("    const SUITS = ['hearts'");
 const b = html.indexOf('    // --- KOCIA EKIPA VS PSY (SABOTEUR) LOGIC');
 const names = ['SUITS', 'RANKS', 'SUIT_META', 'DEFAULT_MAKAO_RULES', 'createStandardDeck', 'canPlayMakaoCard', 'initMakaoState', 'applyMakaoPlay', 'applyMakaoDraw',
   'applyMakaoSayMakao', 'applyMakaoCatch', 'makaoCatchTargets', 'chooseMakaoBotMove', 'advanceMakaoTurn', 'makaoDeckCount', 'plCards', 'makaoLinked', 'chainValid',
-  'jokerIdentities', 'resolveMakaoItems', 'isFunctional', 'attackValue', 'MAKAO_ORDER'];
+  'jokerIdentities', 'resolveMakaoItems', 'makaoLongestChain', 'isFunctional', 'attackValue', 'MAKAO_ORDER'];
 const E = new Function('localStorage', html.slice(a, b) + `\nreturn { ${names.join(', ')} };`)({ getItem: () => null, setItem() {} });
 const R = { ...E.DEFAULT_MAKAO_RULES };
 const P = n => Array.from({ length: n }, (_, i) => ({ id: 'p' + i, name: 'P' + i, isBot: i !== 0 }));
@@ -164,6 +164,16 @@ t('the first card on the table is never functional; functional ones go back into
     const total = st.deck.length + st.discardPile.length + Object.values(st.hands).reduce((s, h) => s + h.length, 0);
     assert.strictEqual(total, 2 * 54, 'four players use two decks with jokers');
   }
+});
+
+t('MAKAO button logic: only when a legal move can leave one card', () => {
+  const k = c('K', 'clubs', 'k'); const four = c('4', 'spades', 'f'); const nine = c('9', 'diamonds', 'n');
+  const st = base(pl2, c('K', 'diamonds'), { p0: [k, four, nine], p1: [c('5', 'clubs')] });
+  assert.strictEqual(E.makaoLongestChain(st, R, [k, four, nine]), 1, 'three cards, only one can go: no MAKAO yet');
+  assert(E.makaoLongestChain(st, R, [k, four]) >= 1, 'two cards: a playable card leaves one');
+  const st2 = base(pl2, c('5', 'spades'), { p0: [c('5', 'spades', 'a'), c('6', 'spades', 'b'), c('9', 'clubs', 'x')], p1: [c('5', 'clubs')] });
+  assert.strictEqual(E.makaoLongestChain(st2, R, [c('5', 'spades', 'a'), c('6', 'spades', 'b'), c('9', 'clubs', 'x')]), 2, '5♠ and 6♠ make a chain of two');
+  assert.strictEqual(E.makaoLongestChain(st2, R, [c('5', 'hearts', 'a'), c('6', 'spades', 'b')]), 1, '5♥ and 6♠ do not link');
 });
 
 t('illegal moves are refused', () => {

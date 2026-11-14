@@ -41,7 +41,7 @@ wszystkie pliki z tego repozytorium.
 
 ### Aktualizacja gry
 
-Po każdej zmianie plików podbij numer w `sw.js` (`const VERSION = 'paw-deck-v5.1.0'`). Telefony pobiorą
+Po każdej zmianie plików podbij numer w `sw.js` (`const VERSION = 'paw-deck-v5.2.0'`). Telefony pobiorą
 nową wersję przy następnym otwarciu aplikacji z internetem.
 
 ## Gra online i czat (Firebase)

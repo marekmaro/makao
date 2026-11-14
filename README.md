@@ -12,6 +12,7 @@ telefonie albo online ze znajomymi (z czatem przy stole).
 | `sw.js` | Service worker — dzięki niemu gra się instaluje i działa bez internetu |
 | `icons/` | Ikony aplikacji |
 | `tests/engine-test.js` | Testy zasad Makao (`node tests/engine-test.js`) |
+| `tests/bots-test.js` | Symulacje botów w Kociej Ekipie i Remiku (`node tests/bots-test.js`) |
 
 ## Instalacja na telefonie
 
@@ -40,7 +41,7 @@ wszystkie pliki z tego repozytorium.
 
 ### Aktualizacja gry
 
-Po każdej zmianie plików podbij numer w `sw.js` (`const VERSION = 'paw-deck-v4.0.0'`). Telefony pobiorą
+Po każdej zmianie plików podbij numer w `sw.js` (`const VERSION = 'paw-deck-v4.1.0'`). Telefony pobiorą
 nową wersję przy następnym otwarciu aplikacji z internetem.
 
 ## Gra online i czat (Firebase)
@@ -90,6 +91,11 @@ Warianty do włączenia w „Zasady i warianty”: tarcza damy pik, jokery, 7 ka
 (online), wyłączenie dowolnej z reguł powyżej.
 
 ## Znane ograniczenia
+
+- Remik jest uproszczony: pierwsze wyłożenie to jeden układ za min. 30 pkt, nie ma dokładania kart do
+  wyłożonych układów ani podmiany jokerów. Gdy talia skończy się drugi raz, rundę wygrywa gracz
+  z najmniejszą liczbą punktów w ręce.
+- Kocia Ekipa w pojedynku „Kot kontra Chytry Pies” sprzyja psu (bot-kot wygrywa ok. 1 na 4 partie z botem-psem).
 
 - Gra online ufa graczom: cały stan stołu (także karty rywali) jest w jednym dokumencie Firestore.
   Do gry ze znajomymi to wystarcza; do gry z obcymi potrzebny byłby serwer rozstrzygający ruchy.

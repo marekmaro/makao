@@ -1590,6 +1590,7 @@
         hands,
         brokenClaws,
         peekedGoals,
+        suspicion: {},
         currentTurnIdx: 0,
         lastMoverId: null,
         lastEvent: duelVariant === 'cat_race'
@@ -1664,10 +1665,12 @@
       const updatedGoals = { ...goals };
       let mouseFound = false;
       const newlyRevealed = [];
+      // Pole sąsiadujące z celem musi mieć wyjście skierowane W STRONĘ celu
+      // (pole nad celem — wyjście w dół, pod celem — w górę, po lewej — w prawo).
       const delta = [
-        { dr: -1, dc: 0, dir: 'N' },
-        { dr: 1, dc: 0, dir: 'S' },
-        { dr: 0, dc: -1, dir: 'W' }
+        { dr: -1, dc: 0, dir: 'S' },
+        { dr: 1, dc: 0, dir: 'N' },
+        { dr: 0, dc: -1, dir: 'E' }
       ];
 
       GOAL_ROWS.forEach(gr => {
@@ -1755,8 +1758,502 @@
         opened,
         currentTurnIdx: 0,
         hasDrawn: false,
+        reshuffles: 0,
         lastEvent: 'Dobierz kartę ze stosu lub odkrytą kartę, wyłóż układy (min. 30 pkt na otwarcie) i odrzuć 1 kartę.'
       };
+    }
+
+    // =========================================================================
+    // 3b. KOCIA EKIPA I REMIK — czyste funkcje tury (stan stołu -> nowy stan) + decyzje botów
+    // Każda funkcja apply* zwraca { room } albo { error: 'komunikat' }.
+    // =========================================================================
+    const SAB_NEIGHBORS = [
+      { dr: -1, dc: 0, out: 'N', back: 'S' },
+      { dr: 0, dc: 1, out: 'E', back: 'W' },
+      { dr: 1, dc: 0, out: 'S', back: 'N' },
+      { dr: 0, dc: -1, out: 'W', back: 'E' }
+    ];
+
+    function sabIsGoalCell(r, c) {
+      return c === GOAL_COL && GOAL_ROWS.includes(r);
+    }
+
+    // Wspólne zakończenie tury: dobranie karty, sprawdzenie celów, wyłonienie zwycięzcy, następny gracz.
+    function sabEndTurn(room, actorId, changes, handAfterPlay, eventText) {
+      const ss = room.saboteur;
+      const deck = [...ss.deck];
+      const hand = [...handAfterPlay];
+      if (deck.length > 0) hand.push(deck.pop());
+
+      const board = changes.board || ss.board;
+      const { updatedGoals, mouseFound, newlyRevealed } = checkSaboteurGoalReached(board, ss.goals);
+      const actor = room.players.find(p => p.id === actorId);
+      const hands = { ...ss.hands, [actorId]: hand };
+      const nextState = {
+        ...ss,
+        deck,
+        board,
+        goals: updatedGoals,
+        brokenClaws: changes.brokenClaws || ss.brokenClaws,
+        peekedGoals: changes.peekedGoals || ss.peekedGoals,
+        suspicion: changes.suspicion || ss.suspicion || {},
+        hands,
+        lastMoverId: actorId
+      };
+
+      if (mouseFound) {
+        const winners = ss.duelVariant === 'cat_race' ? [actor] : room.players.filter(p => ss.roles[p.id] === 'cat');
+        const winnerIds = new Set(winners.map(w => w && w.id));
+        return {
+          ...room,
+          status: 'finished',
+          players: room.players.map(p => winnerIds.has(p.id) ? { ...p, score: (p.score || 0) + 1 } : p),
+          winnerInfo: {
+            winnerName: ss.duelVariant === 'cat_race' ? `${actor?.name} (Złota Mysz!)` : 'Kocia Ekipa 🐱',
+            reason: `${actor?.name} doprowadził tunel prosto do Złotej Myszy! 🐭`
+          },
+          saboteur: { ...nextState, lastEvent: `🐭 ${actor?.name} odnalazł Złotą Mysz!` }
+        };
+      }
+
+      const allEmpty = deck.length === 0 && room.players.every(p => (hands[p.id] || []).length === 0);
+      if (allEmpty) {
+        const dogIds = new Set(room.players.filter(p => ss.roles[p.id] === 'dog').map(d => d.id));
+        return {
+          ...room,
+          status: 'finished',
+          players: room.players.map(p => dogIds.has(p.id) ? { ...p, score: (p.score || 0) + 1 } : p),
+          winnerInfo: {
+            winnerName: dogIds.size > 0 ? 'Chytre Psy 🐶' : 'Remis na Dachu',
+            reason: 'Skończyły się karty — nikt nie dotarł do Złotej Myszy!'
+          },
+          saboteur: { ...nextState, lastEvent: dogIds.size > 0 ? '🐶 Chytre Psy obroniły dach!' : 'Koniec kart — remis.' }
+        };
+      }
+
+      // Następny gracz, który ma jeszcze jakąś kartę.
+      const n = room.players.length;
+      let nextIdx = (ss.currentTurnIdx + 1) % n;
+      for (let i = 0; i < n && (hands[room.players[nextIdx].id] || []).length === 0; i++) {
+        nextIdx = (nextIdx + 1) % n;
+      }
+      const trapNote = newlyRevealed.includes('trap') ? ' Odkryto pustą pułapkę 🪤' : '';
+      return { ...room, saboteur: { ...nextState, currentTurnIdx: nextIdx, lastEvent: eventText + trapNote } };
+    }
+
+    function sabTurnGuard(room, actorId, cardId) {
+      if (!room || room.status !== 'playing' || !room.saboteur) return { error: 'Gra nie jest w toku' };
+      const ss = room.saboteur;
+      if (room.players[ss.currentTurnIdx]?.id !== actorId) return { error: 'Poczekaj na swoją kolej' };
+      const card = (ss.hands[actorId] || []).find(c => c.id === cardId);
+      if (!card) return { error: 'Nie masz tej karty' };
+      return { ss, card, actor: room.players.find(p => p.id === actorId) };
+    }
+
+    function applySabPath(room, actorId, cardId, r, c, rotation = 0) {
+      const g = sabTurnGuard(room, actorId, cardId);
+      if (g.error) return g;
+      const { ss, card, actor } = g;
+      if (card.type !== 'path') return { error: 'To nie jest karta tunelu' };
+      if (ss.brokenClaws[actorId]) return { error: 'Masz złamany pazur! Użyj Kocimiętki lub wymień kartę' };
+      if (!canPlaceSabTile(ss.board, r, c, card, rotation)) return { error: 'Tutaj ten tunel nie pasuje' };
+
+      const board = {
+        ...ss.board,
+        [`${r}_${c}`]: { id: card.id, name: card.name, dirs: rotateDirs(card.dirs, rotation), open: card.open }
+      };
+      const suspicion = { ...(ss.suspicion || {}) };
+      if (!card.open) suspicion[actorId] = (suspicion[actorId] || 0) + 1;
+      const hand = ss.hands[actorId].filter(x => x.id !== card.id);
+      return { room: sabEndTurn(room, actorId, { board, suspicion }, hand, `${actor.name} układa: ${card.name}`) };
+    }
+
+    function applySabAction(room, actorId, cardId, target) {
+      const g = sabTurnGuard(room, actorId, cardId);
+      if (g.error) return g;
+      const { ss, card, actor } = g;
+      if (card.type !== 'action') return { error: 'To nie jest karta akcji' };
+      const hand = ss.hands[actorId].filter(x => x.id !== card.id);
+      const nameOf = id => room.players.find(p => p.id === id)?.name || 'gracza';
+
+      if (card.action === 'break_claw' || card.action === 'fix_claw') {
+        if (!room.players.some(p => p.id === target)) return { error: 'Wybierz gracza' };
+        const breaking = card.action === 'break_claw';
+        if (breaking && target === actorId) return { error: 'Nie łam własnego pazura' };
+        if (breaking && ss.brokenClaws[target]) return { error: 'Ten gracz ma już złamany pazur!' };
+        if (!breaking && !ss.brokenClaws[target]) return { error: 'Ten gracz ma zdrowe pazury!' };
+        const brokenClaws = { ...ss.brokenClaws, [target]: breaking };
+        const text = breaking
+          ? `🩹 ${actor.name} łamie pazur: ${nameOf(target)}!`
+          : `🌿 ${actor.name} leczy pazur (${nameOf(target)}) Kocimiętką!`;
+        return { room: sabEndTurn(room, actorId, { brokenClaws }, hand, text) };
+      }
+
+      if (card.action === 'yarn_bomb') {
+        const tile = ss.board[target];
+        if (!tile || tile.isStart) return { error: 'Wybierz ułożony tunel (nie start)' };
+        const board = { ...ss.board };
+        delete board[target];
+        const suspicion = { ...(ss.suspicion || {}) };
+        if (tile.open) suspicion[actorId] = (suspicion[actorId] || 0) + 1;
+        return { room: sabEndTurn(room, actorId, { board, suspicion }, hand, `🧶 ${actor.name} burzy fragment dachu Kłębkiem Chaosu!`) };
+      }
+
+      if (card.action === 'map_sniff') {
+        const goal = ss.goals[target];
+        if (!goal || goal.revealed) return { error: 'Wybierz zakryty cel' };
+        const peekedGoals = { ...ss.peekedGoals, [actorId]: { ...(ss.peekedGoals[actorId] || {}), [target]: goal.type } };
+        return { room: sabEndTurn(room, actorId, { peekedGoals }, hand, `🗺️ ${actor.name} używa Mapy Węchu!`), peek: goal.type };
+      }
+      return { error: 'Nieznana karta' };
+    }
+
+    function applySabDiscard(room, actorId, cardId) {
+      const g = sabTurnGuard(room, actorId, cardId);
+      if (g.error) return g;
+      const hand = g.ss.hands[actorId].filter(x => x.id !== cardId);
+      return { room: sabEndTurn(room, actorId, {}, hand, `${g.actor.name} wymienia kartę.`) };
+    }
+
+    // Bot w Kociej Ekipie: kot buduje w stronę (prawdopodobnej) myszy, pies blokuje i burzy.
+    function chooseSabBotMove(room, botId) {
+      const ss = room.saboteur;
+      const hand = ss.hands[botId] || [];
+      if (hand.length === 0) return null;
+      const role = ss.roles[botId] || 'cat';
+      const isDog = role === 'dog';
+      const broken = Boolean(ss.brokenClaws[botId]);
+      const peeks = ss.peekedGoals[botId] || {};
+      const suspicion = ss.suspicion || {};
+      const others = room.players.filter(p => p.id !== botId);
+      const find = action => hand.find(c => c.type === 'action' && c.action === action);
+
+      // Co bot wie o celach: odkryte i podejrzane pułapki odpadają, znana mysz zostaje sama.
+      const goalKeys = GOAL_ROWS.map(gr => `${gr}_${GOAL_COL}`);
+      const known = key => (ss.goals[key].revealed ? ss.goals[key].type : peeks[key]) || null;
+      const mouseKey = goalKeys.find(k => known(k) === 'mouse');
+      const candidates = mouseKey ? [mouseKey] : goalKeys.filter(k => known(k) !== 'trap');
+      const unknown = goalKeys.filter(k => !known(k));
+      const distToGoals = (r, c) => Math.min(...candidates.map(k => {
+        const gr = Number(k.split('_')[0]);
+        return Math.abs(gr - r) + Math.abs(GOAL_COL - c);
+      }));
+
+      // Wszystkie legalne położenia danej karty tunelu.
+      const placements = (card) => {
+        const out = [];
+        for (const rot of [0, 180]) {
+          for (let r = 0; r < SAB_ROWS; r++) {
+            for (let c = 0; c < SAB_COLS; c++) {
+              if (canPlaceSabTile(ss.board, r, c, card, rot)) out.push({ card, r, c, rot });
+            }
+          }
+        }
+        return out;
+      };
+      const reachable = getReachableCells(ss.board);
+      const frontierDist = Math.min(...[...reachable].filter(k => ss.board[k]?.open).map(k => {
+        const [r, c] = k.split('_').map(Number);
+        return distToGoals(r, c);
+      }));
+
+      // 1) Złamany pazur: najpierw się leczymy.
+      const fix = find('fix_claw');
+      if (broken && fix) return { type: 'action', cardId: fix.id, target: botId };
+
+      const breakCard = find('break_claw');
+      const yarn = find('yarn_bomb');
+      const sniff = find('map_sniff');
+
+      if (isDog) {
+        // 2) Pies: ślepy zaułek jak najbliżej celów.
+        const duel = room.players.length === 2;
+        if (!broken && (!duel || frontierDist <= 4)) {
+          const blocks = hand.filter(c => c.type === 'path' && !c.open).flatMap(placements)
+            .sort((a, b) => distToGoals(a.r, a.c) - distToGoals(b.r, b.c));
+          if (blocks[0]) return { type: 'path', cardId: blocks[0].card.id, r: blocks[0].r, c: blocks[0].c, rot: blocks[0].rot };
+        }
+        // 3) Łamie pazur graczowi, który najmniej wygląda na psa.
+        // (w 1v1 dopiero gdy tunel jest już blisko celu — pies nie blokuje kota od pierwszej tury).
+        if (breakCard && (room.players.length > 2 || frontierDist <= 3)) {
+          const victim = others.filter(p => !ss.brokenClaws[p.id])
+            .sort((a, b) => (suspicion[a.id] || 0) - (suspicion[b.id] || 0))[0];
+          if (victim) return { type: 'action', cardId: breakCard.id, target: victim.id };
+        }
+        // 4) Burzy tunel, który zaszedł najdalej.
+        if (yarn) {
+          const far = [...reachable].filter(k => ss.board[k]?.open && !ss.board[k].isStart)
+            .map(k => ({ k, d: distToGoals(...k.split('_').map(Number)) }))
+            .sort((a, b) => a.d - b.d)[0];
+          // W pojedynku 1v1 pies burzy dopiero tuż przed celem — inaczej kot nie ma szans.
+          if (far && far.d <= (room.players.length === 2 ? 2 : 4)) return { type: 'action', cardId: yarn.id, target: far.k };
+        }
+        if (sniff && unknown.length > 0) return { type: 'action', cardId: sniff.id, target: unknown[0] };
+        // 5) Nic do psucia: wyrzuca kartę najbardziej przydatną kotom.
+        const junk = hand.find(c => c.type === 'path' && c.open) || hand.find(c => c.action === 'fix_claw') || hand[0];
+        return { type: 'discard', cardId: junk.id };
+      }
+
+      // --- Kot ---
+      // 2) Nie wiadomo, gdzie mysz — warto podejrzeć cel.
+      if (sniff && !mouseKey && unknown.length >= 2) {
+        const target = unknown.includes(`2_${GOAL_COL}`) ? `2_${GOAL_COL}` : unknown[0];
+        return { type: 'action', cardId: sniff.id, target };
+      }
+
+      // 3) Najlepszy tunel: wygrywający albo skracający drogę do celu.
+      let best = null;
+      if (!broken) {
+        hand.filter(c => c.type === 'path' && c.open).flatMap(placements).forEach(p => {
+          const dirs = rotateDirs(p.card.dirs, p.rot);
+          const board = { ...ss.board, [`${p.r}_${p.c}`]: { dirs, open: true } };
+          const res = checkSaboteurGoalReached(board, ss.goals);
+          const hitsCandidate = candidates.some(k => res.updatedGoals[k].revealed && !ss.goals[k].revealed);
+          // Wolne wyjścia: którędy da się budować dalej.
+          let exits = 0;
+          let towardGoal = 0;
+          SAB_NEIGHBORS.forEach(nb => {
+            if (!dirs[nb.out]) return;
+            const nr = p.r + nb.dr;
+            const nc = p.c + nb.dc;
+            if (nr < 0 || nr >= SAB_ROWS || nc < 0 || nc >= SAB_COLS) return;
+            if (ss.board[`${nr}_${nc}`]) return;
+            exits += 1;
+            if (sabIsGoalCell(nr, nc) || distToGoals(nr, nc) < distToGoals(p.r, p.c)) towardGoal += 1;
+          });
+          const score = (res.mouseFound ? 1000 : 0) + (hitsCandidate ? 200 : 0)
+            - distToGoals(p.r, p.c) * 10 + towardGoal * 6 + exits + Math.random();
+          if (!best || score > best.score) best = { ...p, score, dist: distToGoals(p.r, p.c), towardGoal, wins: res.mouseFound || hitsCandidate };
+        });
+      }
+      const pathMove = best && { type: 'path', cardId: best.card.id, r: best.r, c: best.c, rot: best.rot };
+      if (best && (best.wins || (best.dist < frontierDist && best.towardGoal > 0))) return pathMove;
+
+      // 4) Usuwa ślepy zaułek stojący na drodze.
+      if (yarn) {
+        const blocker = Object.keys(ss.board).filter(k => ss.board[k] && ss.board[k].open === false && reachable.has(k))
+          .sort((a, b) => distToGoals(...a.split('_').map(Number)) - distToGoals(...b.split('_').map(Number)))[0];
+        if (blocker) return { type: 'action', cardId: yarn.id, target: blocker };
+      }
+
+      // 5) Łamie pazur rywalowi (1v1) albo podejrzanemu o sabotaż (3+ graczy).
+      if (breakCard) {
+        const twoPlayers = room.players.length === 2;
+        const victim = others.filter(p => !ss.brokenClaws[p.id] && (twoPlayers || (suspicion[p.id] || 0) > 0))
+          .sort((a, b) => (suspicion[b.id] || 0) - (suspicion[a.id] || 0))[0];
+        if (victim) return { type: 'action', cardId: breakCard.id, target: victim.id };
+      }
+
+      // 6) Leczy sojusznika (w grze drużynowej, niepodejrzanego).
+      if (fix && room.players.length > 2) {
+        const friend = others.find(p => ss.brokenClaws[p.id] && !(suspicion[p.id] > 0));
+        if (friend) return { type: 'action', cardId: fix.id, target: friend.id };
+      }
+
+      // 7) Jakikolwiek sensowny tunel jest lepszy niż strata tury.
+      if (pathMove && best.towardGoal > 0) return pathMove;
+
+      // 8) Wymiana karty: najpierw ślepe zaułki, potem zbędne akcje.
+      const junk = hand.find(c => c.type === 'path' && !c.open)
+        || (mouseKey || unknown.length < 2 ? find('map_sniff') : null)
+        || (room.players.length > 2 ? find('break_claw') : null)
+        || hand.find(c => c.type === 'action' && c.action !== 'fix_claw' && c.action !== 'yarn_bomb')
+        || (pathMove || broken ? null : hand.find(c => c.type === 'path'))
+        || hand.find(c => c.type === 'action' && c.action !== 'fix_claw')
+        || hand[0];
+      if (pathMove && junk.type === 'path' && junk.open) return pathMove;
+      return { type: 'discard', cardId: junk.id };
+    }
+
+    // ---- REMIK ----
+    const RUMMY_OPENING_POINTS = 30;
+
+    function rummyHandPoints(hand) {
+      return (hand || []).reduce((acc, c) => acc + getRummyCardPoints(c), 0);
+    }
+
+    function rummyTurnGuard(room, actorId) {
+      if (!room || room.status !== 'playing' || !room.rummy) return { error: 'Gra nie jest w toku' };
+      if (room.players[room.rummy.currentTurnIdx]?.id !== actorId) return { error: 'Poczekaj na swoją kolej' };
+      return { rs: room.rummy, actor: room.players.find(p => p.id === actorId) };
+    }
+
+    function rummyFinish(room, rs, winnerId, reason, eventText) {
+      const winner = room.players.find(p => p.id === winnerId);
+      return {
+        ...room,
+        status: 'finished',
+        players: room.players.map(p => p.id === winnerId ? { ...p, score: (p.score || 0) + 1 } : p),
+        winnerInfo: { winnerId, winnerName: winner?.name || 'Zwycięzca', reason },
+        rummy: { ...rs, lastEvent: eventText }
+      };
+    }
+
+    function applyRummyDraw(room, actorId, fromDiscard = false) {
+      const g = rummyTurnGuard(room, actorId);
+      if (g.error) return g;
+      const { rs, actor } = g;
+      if (rs.hasDrawn) return { error: 'W tej turze masz już dobraną kartę' };
+
+      let deck = [...rs.deck];
+      let discardPile = [...rs.discardPile];
+      let reshuffles = rs.reshuffles || 0;
+      let drawn = null;
+
+      if (fromDiscard && discardPile.length > 0) {
+        drawn = discardPile.pop();
+      } else {
+        if (deck.length === 0) {
+          // Talia skończyła się drugi raz (albo nie ma czego tasować): rundę wygrywa najlżejsza ręka.
+          if (reshuffles >= 1 || discardPile.length <= 1) {
+            const ranked = [...room.players].sort((a, b) => rummyHandPoints(rs.hands[a.id]) - rummyHandPoints(rs.hands[b.id]));
+            return {
+              room: rummyFinish(room, rs, ranked[0].id,
+                `Talia się skończyła — najmniej punktów w ręce (${rummyHandPoints(rs.hands[ranked[0].id])}).`,
+                '🃏 Talia wyczerpana — koniec rundy.')
+            };
+          }
+          const top = discardPile.pop();
+          deck = shuffleArray(discardPile);
+          discardPile = [top];
+          reshuffles += 1;
+        }
+        drawn = deck.pop();
+      }
+
+      return {
+        room: {
+          ...room,
+          rummy: {
+            ...rs,
+            deck,
+            discardPile,
+            reshuffles,
+            hands: { ...rs.hands, [actorId]: [...(rs.hands[actorId] || []), drawn] },
+            hasDrawn: true,
+            lastEvent: `${actor.name} dobiera kartę ${fromDiscard ? 'ze stosu odkrytego' : 'z talii'}.`
+          }
+        }
+      };
+    }
+
+    function applyRummyMeld(room, actorId, cardIds) {
+      const g = rummyTurnGuard(room, actorId);
+      if (g.error) return g;
+      const { rs, actor } = g;
+      if (!rs.hasDrawn) return { error: 'Najpierw dobierz kartę' };
+      const hand = rs.hands[actorId] || [];
+      const ids = new Set(cardIds);
+      const selected = hand.filter(c => ids.has(c.id));
+      if (selected.length !== ids.size) return { error: 'Nie masz tych kart' };
+      const meld = validateRummyMeld(selected);
+      if (!meld) return { error: 'Zaznaczone karty nie tworzą trójki ani sekwensu' };
+      if (!rs.opened[actorId] && meld.points < RUMMY_OPENING_POINTS) {
+        return { error: `Pierwsze wyłożenie wymaga min. ${RUMMY_OPENING_POINTS} pkt (masz ${meld.points})` };
+      }
+
+      const remaining = hand.filter(c => !ids.has(c.id));
+      const nextRs = {
+        ...rs,
+        hands: { ...rs.hands, [actorId]: remaining },
+        melds: [...rs.melds, { id: uid('meld'), ownerName: actor.name, cards: selected }],
+        opened: { ...rs.opened, [actorId]: true },
+        lastEvent: `${actor.name} wykłada układ (${meld.points} pkt)!`
+      };
+      if (remaining.length === 0) {
+        return { room: rummyFinish(room, nextRs, actorId, 'Wyłożył wszystkie karty!', `🏆 ${actor.name} kończy Remika wyłożeniem!`) };
+      }
+      return { room: { ...room, rummy: nextRs } };
+    }
+
+    function applyRummyDiscard(room, actorId, cardId) {
+      const g = rummyTurnGuard(room, actorId);
+      if (g.error) return g;
+      const { rs, actor } = g;
+      if (!rs.hasDrawn) return { error: 'Najpierw dobierz kartę' };
+      const hand = rs.hands[actorId] || [];
+      const card = hand.find(c => c.id === cardId);
+      if (!card) return { error: 'Nie masz tej karty' };
+
+      const remaining = hand.filter(c => c.id !== cardId);
+      const nextRs = {
+        ...rs,
+        hands: { ...rs.hands, [actorId]: remaining },
+        discardPile: [...rs.discardPile, card],
+        hasDrawn: false,
+        lastEvent: `${actor.name} odrzuca ${card.rank === 'JOKER' ? 'Jokera' : `${card.rank}${SUIT_META[card.suit]?.symbol}`}.`
+      };
+      if (remaining.length === 0) {
+        return { room: rummyFinish(room, nextRs, actorId, 'Zamknął rundę, odrzucając ostatnią kartę!', `🏆 ${actor.name} zamyka Remika!`) };
+      }
+      return { room: { ...room, rummy: { ...nextRs, currentTurnIdx: (rs.currentTurnIdx + 1) % room.players.length } } };
+    }
+
+    // Najlepszy układ (3–5 kart) możliwy do wyłożenia z podanych kart.
+    function findBestRummyMeld(cards, minPoints = 0) {
+      let best = null;
+      const n = cards.length;
+      const consider = (combo) => {
+        const meld = validateRummyMeld(combo);
+        if (!meld || meld.points < minPoints) return;
+        // Wolimy dłuższe układy, a przy tej samej długości — bez marnowania jokerów.
+        const jokers = combo.filter(c => c.rank === 'JOKER').length;
+        const value = combo.length * 100 - jokers * 40 + meld.points;
+        if (!best || value > best.value) best = { cards: combo, points: meld.points, value };
+      };
+      for (let a = 0; a < n - 2; a++) {
+        for (let b = a + 1; b < n - 1; b++) {
+          for (let c = b + 1; c < n; c++) {
+            consider([cards[a], cards[b], cards[c]]);
+            for (let d = c + 1; d < n; d++) {
+              consider([cards[a], cards[b], cards[c], cards[d]]);
+              for (let e = d + 1; e < n; e++) {
+                consider([cards[a], cards[b], cards[c], cards[d], cards[e]]);
+              }
+            }
+          }
+        }
+      }
+      return best;
+    }
+
+    // Bot w Remiku: zbiera pary pod układy, trzyma jokery, przed otwarciem pilnuje wysokich kart.
+    function chooseRummyBotMove(room, botId) {
+      const rs = room.rummy;
+      const hand = rs.hands[botId] || [];
+      const opened = Boolean(rs.opened[botId]);
+      const minPoints = opened ? 0 : RUMMY_OPENING_POINTS;
+
+      if (!rs.hasDrawn) {
+        // Odkrytą kartę bierzemy tylko wtedy, gdy od razu domyka układ.
+        const top = rs.discardPile[rs.discardPile.length - 1];
+        if (top) {
+          const withTop = findBestRummyMeld([...hand, top], minPoints);
+          if (withTop && withTop.cards.some(c => c.id === top.id)) return { type: 'draw', fromDiscard: true };
+        }
+        return { type: 'draw', fromDiscard: false };
+      }
+
+      const meld = findBestRummyMeld(hand, minPoints);
+      if (meld) return { type: 'meld', cardIds: meld.cards.map(c => c.id) };
+
+      // Odrzut: karta, która ma najmniej „partnerów” do przyszłego układu.
+      const order = ['A', '2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K', 'A'];
+      const partners = (card) => hand.filter(o => {
+        if (o.id === card.id || o.rank === 'JOKER') return false;
+        if (o.rank === card.rank) return o.suit !== card.suit;
+        if (o.suit !== card.suit) return false;
+        const diffs = [];
+        order.forEach((r1, i) => order.forEach((r2, j) => { if (r1 === card.rank && r2 === o.rank) diffs.push(Math.abs(i - j)); }));
+        return Math.min(...diffs) <= 2;
+      }).length;
+      const scored = hand.filter(c => c.rank !== 'JOKER').map(c => ({
+        c,
+        // Przed otwarciem wysokie karty są cenne (30 pkt), po otwarciu — to balast.
+        key: partners(c) * 100 + (opened ? -getRummyCardPoints(c) : getRummyCardPoints(c))
+      })).sort((a, b) => a.key - b.key);
+      const pick = scored[0]?.c || hand[0];
+      return { type: 'discard', cardId: pick.id };
     }
 
     // =========================================================================
@@ -3006,217 +3503,53 @@
       // =======================================================================
       // 8. SABOTEUR (KOCIA EKIPA VS PSY) ACTIONS
       // =======================================================================
-      const finishSabTurnAndDraw = (prevRoom, actorId, nextBoard, nextGoals, nextBroken, nextPeeks, nextHandAfterPlay, eventText) => {
-        const ss = prevRoom.saboteur;
-        let deck = [...ss.deck];
-        const hand = [...nextHandAfterPlay];
-        if (deck.length > 0) hand.push(deck.pop());
-
-        const { updatedGoals, mouseFound } = checkSaboteurGoalReached(nextBoard, nextGoals);
-        const actor = prevRoom.players.find(p => p.id === actorId);
-
-        if (mouseFound) {
-          SoundFX.win();
-          const winners = ss.duelVariant === 'cat_race'
-            ? [actor]
-            : prevRoom.players.filter(p => ss.roles[p.id] === 'cat');
-          const winnerIds = new Set(winners.map(w => w?.id));
-          return {
-            ...prevRoom,
-            status: 'finished',
-            players: prevRoom.players.map(p => winnerIds.has(p.id) ? { ...p, score: (p.score || 0) + 1 } : p),
-            winnerInfo: {
-              winnerName: ss.duelVariant === 'cat_race' ? `${actor?.name} (Złota Mysz!)` : 'Kocia Ekipa 🐱',
-              reason: `${actor?.name} doprowadził tunel prosto do Złotej Myszy! 🐭`
-            },
-            saboteur: {
-              ...ss,
-              deck,
-              board: nextBoard,
-              goals: updatedGoals,
-              brokenClaws: nextBroken,
-              peekedGoals: nextPeeks,
-              hands: { ...ss.hands, [actorId]: hand },
-              lastEvent: `🐭 ${actor?.name} odnalazł Złotą Mysz!`
-            }
-          };
-        }
-
-        const nextHands = { ...ss.hands, [actorId]: hand };
-        const allEmpty = deck.length === 0 && prevRoom.players.every(p => (nextHands[p.id] || []).length === 0);
-        if (allEmpty) {
-          SoundFX.win();
-          const dogs = prevRoom.players.filter(p => ss.roles[p.id] === 'dog');
-          const dogIds = new Set(dogs.map(d => d.id));
-          return {
-            ...prevRoom,
-            status: 'finished',
-            players: prevRoom.players.map(p => dogIds.has(p.id) ? { ...p, score: (p.score || 0) + 1 } : p),
-            winnerInfo: {
-              winnerName: dogs.length > 0 ? 'Chytre Psy 🐶' : 'Remis na Dachu',
-              reason: 'Skończyły się karty — Koty nie dotarły do Złotej Myszy!'
-            },
-            saboteur: {
-              ...ss,
-              deck,
-              board: nextBoard,
-              goals: updatedGoals,
-              hands: nextHands,
-              lastEvent: '🐶 Chytre Psy skutecznie obroniły dach!'
-            }
-          };
-        }
-
-        const nextIdx = (ss.currentTurnIdx + 1) % prevRoom.players.length;
-        return {
-          ...prevRoom,
-          saboteur: {
-            ...ss,
-            deck,
-            board: nextBoard,
-            goals: updatedGoals,
-            brokenClaws: nextBroken,
-            peekedGoals: nextPeeks,
-            hands: nextHands,
-            currentTurnIdx: nextIdx,
-            lastMoverId: actorId,
-            lastEvent: eventText
+      // Wspólne domknięcie ruchu: zapis stanu, dźwięk, zasłona „przekaż telefon”.
+      const commitTurnResult = (res, actorId, stateKey) => {
+        if (!res || res.error) {
+          if (res?.error && actorId === activePlayerId) {
+            SoundFX.error();
+            showToast(res.error, 'error');
           }
-        };
+          return null;
+        }
+        const updated = commitRoomState(() => res.room);
+        if (!updated) return null;
+        if (updated.status === 'finished') {
+          SoundFX.win();
+        } else if (updated.isPassAndPlay) {
+          const nextPl = updated.players[updated[stateKey].currentTurnIdx];
+          if (nextPl && !nextPl.isBot && nextPl.id !== actorId) setPassPhoneNextPlayer(nextPl);
+        }
+        return updated;
       };
 
       const executeSabPlayPath = (actorId, card, r, c, rotation = 0) => {
-        const curr = roomRef.current;
-        if (!curr || curr.status !== 'playing' || !curr.saboteur) return;
-        const ss = curr.saboteur;
-        if (curr.players[ss.currentTurnIdx]?.id !== actorId) return;
-        if (ss.brokenClaws[actorId]) {
-          if (actorId === activePlayerId) showToast('Masz złamany pazur! Użyj Kocimiętki lub wymień kartę', 'error');
-          return;
-        }
-        if (!canPlaceSabTile(ss.board, r, c, card, rotation)) {
-          if (actorId === activePlayerId) SoundFX.error();
-          return;
-        }
-
+        const res = applySabPath(roomRef.current, actorId, card.id, r, c, rotation);
+        if (!commitTurnResult(res, actorId, 'saboteur')) return;
         if (actorId === activePlayerId) SoundFX.play();
-        const actor = curr.players.find(p => p.id === actorId);
-        const placedTile = {
-          id: card.id,
-          name: card.name,
-          dirs: rotateDirs(card.dirs, rotation),
-          open: card.open
-        };
-        const nextBoard = { ...ss.board, [`${r}_${c}`]: placedTile };
-        const nextHand = (ss.hands[actorId] || []).filter(x => x.id !== card.id);
-
         setSelectedCardId(null);
         setSabActionTargetMode(null);
-
-        const updated = commitRoomState(prev =>
-          finishSabTurnAndDraw(
-            prev,
-            actorId,
-            nextBoard,
-            ss.goals,
-            ss.brokenClaws,
-            ss.peekedGoals,
-            nextHand,
-            `${actor?.name} układa: ${card.name}`
-          )
-        );
-        if (updated?.isPassAndPlay) {
-          const nextPl = updated.players[updated.saboteur.currentTurnIdx];
-          if (nextPl && !nextPl.isBot) setPassPhoneNextPlayer(nextPl);
-        }
       };
 
       const executeSabAction = (actorId, card, targetInfo) => {
-        const curr = roomRef.current;
-        if (!curr || curr.status !== 'playing' || !curr.saboteur) return;
-        const ss = curr.saboteur;
-        if (curr.players[ss.currentTurnIdx]?.id !== actorId) return;
-
-        const actor = curr.players.find(p => p.id === actorId);
-        const nextHand = (ss.hands[actorId] || []).filter(x => x.id !== card.id);
-        let nextBoard = { ...ss.board };
-        let nextBroken = { ...ss.brokenClaws };
-        let nextPeeks = { ...ss.peekedGoals };
-        let eventText = '';
-
-        if (card.action === 'break_claw') {
-          if (nextBroken[targetInfo]) {
-            if (actorId === activePlayerId) showToast('Ten gracz ma już złamany pazur!', 'error');
-            return;
-          }
-          nextBroken[targetInfo] = true;
-          const targetName = curr.players.find(p => p.id === targetInfo)?.name || 'rywala';
-          eventText = `🩹 ${actor?.name} łamie pazur graczowi ${targetName}!`;
-        } else if (card.action === 'fix_claw') {
-          if (!nextBroken[targetInfo]) {
-            if (actorId === activePlayerId) showToast('Ten gracz ma zdrowe pazury!', 'error');
-            return;
-          }
-          nextBroken[targetInfo] = false;
-          const targetName = curr.players.find(p => p.id === targetInfo)?.name || 'gracza';
-          eventText = `🌿 ${actor?.name} leczy pazur (${targetName}) Kocimiętką!`;
-        } else if (card.action === 'yarn_bomb') {
-          if (!nextBoard[targetInfo] || nextBoard[targetInfo].isStart) return;
-          delete nextBoard[targetInfo];
-          eventText = `🧶 ${actor?.name} rzuca Kłębek Chaosu i burzy fragment dachu!`;
-        } else if (card.action === 'map_sniff') {
-          const goalObj = ss.goals[targetInfo];
-          if (!goalObj) return;
-          nextPeeks = {
-            ...nextPeeks,
-            [actorId]: { ...(nextPeeks[actorId] || {}), [targetInfo]: goalObj.type }
-          };
-          eventText = `🗺️ ${actor?.name} używa Mapy Węchu!`;
-          if (actorId === activePlayerId) {
-            setSabPeekResult(goalObj.type === 'mouse' ? '🐭 Mapa Węchu: TUTAJ JEST ZŁOTA MYSZ!' : '🪤 Mapa Węchu: To tylko pusta pułapka.');
+        const res = applySabAction(roomRef.current, actorId, card.id, targetInfo);
+        if (!commitTurnResult(res, actorId, 'saboteur')) return;
+        if (actorId === activePlayerId) {
+          SoundFX.play();
+          if (res.peek) {
+            setSabPeekResult(res.peek === 'mouse' ? '🐭 Mapa Węchu: TUTAJ JEST ZŁOTA MYSZ!' : '🪤 Mapa Węchu: To tylko pusta pułapka.');
           }
         }
-
-        if (actorId === activePlayerId) SoundFX.play();
         setSelectedCardId(null);
         setSabActionTargetMode(null);
-
-        const updated = commitRoomState(prev =>
-          finishSabTurnAndDraw(prev, actorId, nextBoard, ss.goals, nextBroken, nextPeeks, nextHand, eventText)
-        );
-        if (updated?.isPassAndPlay) {
-          const nextPl = updated.players[updated.saboteur.currentTurnIdx];
-          if (nextPl && !nextPl.isBot) setPassPhoneNextPlayer(nextPl);
-        }
       };
 
       const executeSabDiscard = (actorId, card) => {
-        const curr = roomRef.current;
-        if (!curr || curr.status !== 'playing' || !curr.saboteur) return;
-        const ss = curr.saboteur;
-        if (curr.players[ss.currentTurnIdx]?.id !== actorId) return;
-        const actor = curr.players.find(p => p.id === actorId);
-        const nextHand = (ss.hands[actorId] || []).filter(x => x.id !== card.id);
+        const res = applySabDiscard(roomRef.current, actorId, card.id);
+        if (!commitTurnResult(res, actorId, 'saboteur')) return;
         if (actorId === activePlayerId) SoundFX.draw();
         setSelectedCardId(null);
         setSabActionTargetMode(null);
-
-        const updated = commitRoomState(prev =>
-          finishSabTurnAndDraw(
-            prev,
-            actorId,
-            ss.board,
-            ss.goals,
-            ss.brokenClaws,
-            ss.peekedGoals,
-            nextHand,
-            `${actor?.name} wymienia 1 kartę.`
-          )
-        );
-        if (updated?.isPassAndPlay) {
-          const nextPl = updated.players[updated.saboteur.currentTurnIdx];
-          if (nextPl && !nextPl.isBot) setPassPhoneNextPlayer(nextPl);
-        }
       };
 
       const handleSabCellLongPress = ({ r, c, tile, goal, isStart, isGoalRow, peekedType }) => {
@@ -3269,166 +3602,32 @@
       // 9. RUMMY (REMIK KLUBOWY) ACTIONS
       // =======================================================================
       const executeRummyDraw = (actorId, fromDiscard = false) => {
-        const curr = roomRef.current;
-        if (!curr || curr.status !== 'playing' || !curr.rummy) return;
-        const rs = curr.rummy;
-        if (curr.players[rs.currentTurnIdx]?.id !== actorId || rs.hasDrawn) return;
-
-        let deck = [...rs.deck];
-        let discardPile = [...rs.discardPile];
-        let drawn = null;
-
-        if (fromDiscard && discardPile.length > 0) {
-          drawn = discardPile.pop();
-        } else {
-          if (deck.length === 0 && discardPile.length > 1) {
-            const top = discardPile.pop();
-            deck = shuffleArray(discardPile);
-            discardPile = [top];
-          }
-          if (deck.length === 0) deck = createStandardDeck({ includeJokers: true, numDecks: 1 });
-          drawn = deck.pop();
-        }
-
-        if (!drawn) return;
-        if (actorId === activePlayerId) SoundFX.draw();
-        const actor = curr.players.find(p => p.id === actorId);
-
-        commitRoomState(prev => ({
-          ...prev,
-          rummy: {
-            ...prev.rummy,
-            deck,
-            discardPile,
-            hands: {
-              ...prev.rummy.hands,
-              [actorId]: [...(prev.rummy.hands[actorId] || []), drawn]
-            },
-            hasDrawn: true,
-            lastEvent: `${actor?.name} dobiera kartę ${fromDiscard ? 'ze stosu odkrytego' : 'z talii'}.`
-          }
-        }));
+        const res = applyRummyDraw(roomRef.current, actorId, fromDiscard);
+        if (commitTurnResult(res, actorId, 'rummy') && actorId === activePlayerId) SoundFX.draw();
       };
 
       const executeRummyMeld = (actorId, cardIds) => {
-        const curr = roomRef.current;
-        if (!curr || curr.status !== 'playing' || !curr.rummy) return;
-        const rs = curr.rummy;
-        if (curr.players[rs.currentTurnIdx]?.id !== actorId || !rs.hasDrawn) {
-          if (actorId === activePlayerId) showToast('Najpierw dobierz kartę na początku tury', 'error');
-          return;
+        const res = applyRummyMeld(roomRef.current, actorId, cardIds);
+        if (!commitTurnResult(res, actorId, 'rummy')) return;
+        if (actorId === activePlayerId) {
+          SoundFX.play();
+          setRummySelectedIds([]);
         }
-        const hand = rs.hands[actorId] || [];
-        const selected = hand.filter(c => cardIds.includes(c.id));
-        const meldCheck = validateRummyMeld(selected);
-        if (!meldCheck) {
-          if (actorId === activePlayerId) {
-            SoundFX.error();
-            showToast('Zaznaczone karty nie tworzą poprawnej trójki ani sekwensu', 'error');
-          }
-          return;
-        }
-
-        const isOpened = rs.opened[actorId];
-        if (!isOpened && meldCheck.points < 30) {
-          if (actorId === activePlayerId) {
-            SoundFX.error();
-            showToast(`Pierwsze otwarcie wymaga min. 30 pkt (masz ${meldCheck.points} pkt)`, 'error');
-          }
-          return;
-        }
-
-        if (actorId === activePlayerId) SoundFX.play();
-        const actor = curr.players.find(p => p.id === actorId);
-        const remaining = hand.filter(c => !cardIds.includes(c.id));
-        setRummySelectedIds([]);
-
-        if (remaining.length === 0) {
-          SoundFX.win();
-          commitRoomState(prev => ({
-            ...prev,
-            status: 'finished',
-            players: prev.players.map(p => p.id === actorId ? { ...p, score: (p.score || 0) + 1 } : p),
-            winnerInfo: { winnerName: actor?.name || 'Zwycięzca', reason: 'Wyłożył wszystkie karty w Remiku!' },
-            rummy: {
-              ...rs,
-              hands: { ...rs.hands, [actorId]: [] },
-              melds: [...rs.melds, { id: uid('meld'), ownerName: actor?.name, cards: selected }],
-              opened: { ...rs.opened, [actorId]: true },
-              lastEvent: `🏆 ${actor?.name} kończy Remika wyłożeniem z ręki!`
-            }
-          }));
-          return;
-        }
-
-        commitRoomState(prev => ({
-          ...prev,
-          rummy: {
-            ...prev.rummy,
-            hands: { ...prev.rummy.hands, [actorId]: remaining },
-            melds: [...prev.rummy.melds, { id: uid('meld'), ownerName: actor?.name, cards: selected }],
-            opened: { ...prev.rummy.opened, [actorId]: true },
-            lastEvent: `${actor?.name} wykłada układ (${meldCheck.points} pkt)!`
-          }
-        }));
       };
 
       const executeRummyDiscard = (actorId, cardId) => {
-        const curr = roomRef.current;
-        if (!curr || curr.status !== 'playing' || !curr.rummy) return;
-        const rs = curr.rummy;
-        if (curr.players[rs.currentTurnIdx]?.id !== actorId || !rs.hasDrawn) {
-          if (actorId === activePlayerId) showToast('Najpierw dobierz kartę przed odrzuceniem', 'error');
-          return;
-        }
-        const hand = rs.hands[actorId] || [];
-        const card = hand.find(c => c.id === cardId);
-        if (!card) return;
-
-        const remaining = hand.filter(c => c.id !== cardId);
-        const actor = curr.players.find(p => p.id === actorId);
-        setRummySelectedIds([]);
-
-        if (remaining.length === 0) {
-          SoundFX.win();
-          commitRoomState(prev => ({
-            ...prev,
-            status: 'finished',
-            players: prev.players.map(p => p.id === actorId ? { ...p, score: (p.score || 0) + 1 } : p),
-            winnerInfo: { winnerName: actor?.name || 'Zwycięzca', reason: 'Zamknął rundę odrzucając ostatnią kartę!' },
-            rummy: {
-              ...rs,
-              hands: { ...rs.hands, [actorId]: [] },
-              discardPile: [...rs.discardPile, card],
-              lastEvent: `🏆 ${actor?.name} zamyka Remika!`
-            }
-          }));
-          return;
-        }
-
-        if (actorId === activePlayerId) SoundFX.play();
-        const nextIdx = (rs.currentTurnIdx + 1) % curr.players.length;
-        const updated = commitRoomState(prev => ({
-          ...prev,
-          rummy: {
-            ...prev.rummy,
-            hands: { ...prev.rummy.hands, [actorId]: remaining },
-            discardPile: [...prev.rummy.discardPile, card],
-            currentTurnIdx: nextIdx,
-            hasDrawn: false,
-            lastEvent: `${actor?.name} odrzuca ${card.rank === 'JOKER' ? 'Jokera' : `${card.rank}${SUIT_META[card.suit]?.symbol}`}.`
-          }
-        }));
-        if (updated?.isPassAndPlay) {
-          const nextPl = updated.players[nextIdx];
-          if (nextPl && !nextPl.isBot) setPassPhoneNextPlayer(nextPl);
+        const res = applyRummyDiscard(roomRef.current, actorId, cardId);
+        if (!commitTurnResult(res, actorId, 'rummy')) return;
+        if (actorId === activePlayerId) {
+          SoundFX.play();
+          setRummySelectedIds([]);
         }
       };
 
       // =======================================================================
       // 10. RELIABLE AI BOT ENGINE + WATCHDOG & CHAT
       // =======================================================================
-      const botStepTrigger = useCallback(() => {
+      const botStepImpl = () => {
         const curr = roomRef.current;
         if (!curr || curr.status !== 'playing') return;
         if (curr.isOnline && curr.hostId !== playerId) return;
@@ -3452,74 +3651,28 @@
         }
 
         if (curr.gameType === 'saboteur') {
-          const hand = gState.hands[turnPlayer.id] || [];
-          const myRole = gState.roles[turnPlayer.id] || 'cat';
-          const isBroken = gState.brokenClaws[turnPlayer.id];
-
-          if (isBroken) {
-            const fixCard = hand.find(c => c.type === 'action' && c.action === 'fix_claw');
-            if (fixCard) {
-              executeSabAction(turnPlayer.id, fixCard, turnPlayer.id);
-              return;
-            }
-          }
-
-          if (!isBroken) {
-            const pathCards = hand.filter(c => c.type === 'path' && (myRole === 'cat' ? c.open : !c.open));
-            const fallbackPaths = pathCards.length > 0 ? pathCards : hand.filter(c => c.type === 'path');
-            for (const pCard of fallbackPaths) {
-              for (const rot of [0, 180]) {
-                for (let c = SAB_COLS - 1; c >= 0; c--) {
-                  for (let r = 0; r < SAB_ROWS; r++) {
-                    if (canPlaceSabTile(gState.board, r, c, pCard, rot)) {
-                      executeSabPlayPath(turnPlayer.id, pCard, r, c, rot);
-                      return;
-                    }
-                  }
-                }
-              }
-            }
-          }
-
-          const breakCard = hand.find(c => c.type === 'action' && c.action === 'break_claw');
-          if (breakCard) {
-            const target = curr.players.find(p => p.id !== turnPlayer.id && !gState.brokenClaws[p.id]);
-            if (target) {
-              executeSabAction(turnPlayer.id, breakCard, target.id);
-              return;
-            }
-          }
-
-          if (hand[0]) executeSabDiscard(turnPlayer.id, hand[0]);
+          const move = chooseSabBotMove(curr, turnPlayer.id);
+          if (!move) return;
+          const card = (gState.hands[turnPlayer.id] || []).find(c => c.id === move.cardId);
+          if (!card) return;
+          if (move.type === 'path') executeSabPlayPath(turnPlayer.id, card, move.r, move.c, move.rot);
+          else if (move.type === 'action') executeSabAction(turnPlayer.id, card, move.target);
+          else executeSabDiscard(turnPlayer.id, card);
           return;
         }
 
         if (curr.gameType === 'rummy') {
-          if (!gState.hasDrawn) {
-            executeRummyDraw(turnPlayer.id, false);
-            return;
-          }
-          const hand = gState.hands[turnPlayer.id] || [];
-          if (hand.length >= 3) {
-            for (let i = 0; i < hand.length - 2; i++) {
-              for (let j = i + 1; j < hand.length - 1; j++) {
-                for (let k = j + 1; k < hand.length; k++) {
-                  const combo = [hand[i], hand[j], hand[k]];
-                  const valid = validateRummyMeld(combo);
-                  if (valid && (gState.opened[turnPlayer.id] || valid.points >= 30)) {
-                    executeRummyMeld(turnPlayer.id, combo.map(x => x.id));
-                    return;
-                  }
-                }
-              }
-            }
-          }
-          if (hand.length > 0) {
-            const sortedByPts = [...hand].sort((a, b) => getRummyCardPoints(b) - getRummyCardPoints(a));
-            executeRummyDiscard(turnPlayer.id, sortedByPts[0].id);
-          }
+          const move = chooseRummyBotMove(curr, turnPlayer.id);
+          if (move.type === 'draw') executeRummyDraw(turnPlayer.id, move.fromDiscard);
+          else if (move.type === 'meld') executeRummyMeld(turnPlayer.id, move.cardIds);
+          else executeRummyDiscard(turnPlayer.id, move.cardId);
         }
-      }, [playerId]);
+      };
+      // Ref trzyma zawsze najświeższą wersję funkcji — inaczej bot używałby starego stanu
+      // (m.in. nie wysyłałby swoich ruchów do pozostałych graczy online).
+      const botStepRef = useRef(null);
+      botStepRef.current = botStepImpl;
+      const botStepTrigger = useCallback(() => { if (botStepRef.current) botStepRef.current(); }, []);
 
       useEffect(() => {
         if (screen !== 'game' || room?.status !== 'playing') return;

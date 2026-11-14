@@ -41,7 +41,7 @@ wszystkie pliki z tego repozytorium.
 
 ### Aktualizacja gry
 
-Po każdej zmianie plików podbij numer w `sw.js` (`const VERSION = 'paw-deck-v5.5.0'`). Telefony pobiorą
+Po każdej zmianie plików podbij numer w `sw.js` (`const VERSION = 'paw-deck-v5.6.0'`). Telefony pobiorą
 nową wersję przy następnym otwarciu aplikacji z internetem.
 
 ## Gra online i czat (Firebase)
@@ -117,6 +117,14 @@ Uproszczenia względem planszowego pierwowzoru: nie ma drzwi i kluczy, trolli, m
 - **Tytuły** odblokowują się grą (np. 3 wygrane w Makao, seria 3 wygranych, pojedynek o myszy wygrany).
 - **Kolor stołu** zmienia wygląd stołu tylko u Ciebie. Ramki i awatary wybierasz w profilu.
 - Wygrana kończy się konfetti i trofeum.
+
+## Dźwięk, historia i kopia zapasowa
+
+- **Muzyka tła** to łagodna pętla generowana w przeglądarce (bez plików audio). Włączasz ją w menu ☰ albo w profilu,
+  głośność regulujesz w profilu. Startuje po pierwszym dotknięciu ekranu, bo przeglądarki tak wymagają.
+- **Historia partii** zapisuje ostatnie 100 rund: grę, wynik, graczy, powód zakończenia i datę. Ostatnie widać w profilu.
+- **Kopia zapasowa:** „Eksportuj do pliku” zapisuje statystyki, historię, ustawienia i profil do pliku JSON.
+  „Importuj z pliku” wczytuje go na innym urządzeniu i zastępuje dane obecne.
 
 ## Znane ograniczenia
 

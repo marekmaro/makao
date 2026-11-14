@@ -25,7 +25,7 @@
   <style>
     :root {
       color-scheme: light;
-      --paper-bg: #F6F3EC;
+      --paper-bg: #F5EEDF;
       --paper-card: #FFFFFF;
       --paper-tint: #EFECE3;
       --ink-main: #141A18;
@@ -438,6 +438,9 @@
     /* Menu główne: sukno z wachlarzem kart-gier + żetony trybów gry */
     .menu-felt {
       position: relative;
+      background: radial-gradient(120% 70% at 50% 28%, #8AA58F 0%, #5F7F69 58%, #47624F 100%) !important;
+      border-color: #33493A !important;
+      box-shadow: 0 6px 0 #33493A, inset 0 2px 0 rgba(255,255,255,0.18) !important;
       border-radius: 30px;
       padding: 14px 14px 16px;
       color: #F7F5F0;
@@ -850,7 +853,7 @@
       height: 64px;
       border-radius: 20px;
       border: 1px solid rgba(255,255,255,0.12);
-      background: linear-gradient(160deg, #1B4D44 0%, #0B3A33 100%);
+      background: linear-gradient(160deg, #7C9C84 0%, #56735F 100%);
       box-shadow: 0 4px 0 #041A16, inset 0 1px 0 rgba(255,255,255,0.18);
       color: #F6F3EC;
       font-size: 0;
@@ -864,6 +867,9 @@
       justify-content: center;
     }
     .chip-main .chip-face {
+      background: linear-gradient(160deg, #DB8A70 0%, #B8603F 100%) !important;
+      border-color: #F3E3B5 !important;
+      box-shadow: 0 5px 0 #7A3C25, 0 0 0 3px #F5EEDF, 0 0 0 4.5px #C9A46B !important;
       width: 76px;
       height: 76px;
       border-radius: 23px;
@@ -1062,11 +1068,25 @@
   <div id="root">
     <div class="boot-splash">
       <div class="boot-paw"><svg viewBox="0 0 64 64" width="100%" height="100%" aria-hidden="true">
-        <path d="M9.500 23L7 4.500l16.500 8q8.500-2.500 17 0L57 4.500 54.500 23q4.500 7 4.500 15 0 22-27 22T5 38q0-8 4.500-15z" fill="#E84A3A"/>
-        <path d="M11.500 9.500l8 4-6.500 5.500zM52.500 9.500l-8 4 6.500 5.500z" fill="#F7A99F"/>
-        <path fill-rule="evenodd" d="M32 18.500L46 53h-6.700l-2.500-6.500h-9.600L24.700 53H18zM32 30.500l-3 10h6z" fill="#FFFDF8"/>
-        <ellipse cx="19.500" cy="30" rx="2.500" ry="3.200" fill="#141A18"/><ellipse cx="44.500" cy="30" rx="2.500" ry="3.200" fill="#141A18"/>
-        <g stroke="#FFFDF8" stroke-width="1.700" stroke-linecap="round"><path d="M20 41.500L8 39.500M19.500 46L8 48M44 41.500l12-2M44.500 46L56 48"/></g>
+        <rect width="64" height="64" rx="18" fill="#C46A4B"/>
+        <path d="M11 30 L12.5 9 L27 20 Z" fill="#F3E3B5" stroke="#2B2118" strokeWidth="1.6" strokeLinejoin="round"/>
+        <path d="M53 30 L51.5 9 L37 20 Z" fill="#F3E3B5" stroke="#2B2118" strokeWidth="1.6" strokeLinejoin="round"/>
+        <path d="M13.5 26 L14.2 14.5 L22.5 20.5 Z" fill="#E9A99A"/>
+        <path d="M50.5 26 L49.8 14.5 L41.5 20.5 Z" fill="#E9A99A"/>
+        <ellipse cx="32" cy="35" rx="21" ry="19" fill="#F3E3B5" stroke="#2B2118" strokeWidth="1.6"/>
+        <ellipse cx="23.5" cy="33.5" rx="4.2" ry="4.8" fill="#FFFDF8" stroke="#2B2118" strokeWidth="1.2"/>
+        <ellipse cx="40.5" cy="33.5" rx="4.2" ry="4.8" fill="#FFFDF8" stroke="#2B2118" strokeWidth="1.2"/>
+        <circle cx="24.4" cy="34.2" r="2.2" fill="#2B2118"/>
+        <circle cx="39.6" cy="34.2" r="2.2" fill="#2B2118"/>
+        <circle cx="25.2" cy="33.2" r=".7" fill="#FFFFFF"/>
+        <circle cx="40.4" cy="33.2" r=".7" fill="#FFFFFF"/>
+        <path d="M29.6 42.6h4.8L32 45.4z" fill="#D9736A" stroke="#2B2118" strokeWidth="0.8" strokeLinejoin="round"/>
+        <path d="M26.4 47.2q2.7 2.6 5.6 0q2.9 2.6 5.6 0" stroke="#2B2118" strokeWidth="1.5" fill="none" strokeLinecap="round"/>
+        <g stroke="#2B2118" strokeWidth="1.1" strokeLinecap="round"><path d="M16.5 41L8 39.5M16.8 44.2L8.5 45.6M47.5 41L56 39.5M47.2 44.2L55.5 45.6"/></g>
+        <g transform="rotate(14 50 50)">
+          <rect x="41.5" y="41" width="15" height="20.5" rx="2.6" fill="#FFFDF8" stroke="#2B2118" strokeWidth="1.1"/>
+          <text x="49" y="55" textAnchor="middle" fontFamily="Georgia, serif" fontWeight="900" fontSize="11" fill="#C46A4B">A</text>
+        </g>
       </svg></div>
       <div class="boot-title">Asy<span class="amp">&amp;</span>Wąsy</div>
       <div class="boot-sub">Tasuję karty…</div>
@@ -1191,6 +1211,16 @@
           osc.stop(this.ctx.currentTime + delay + dur);
         } catch (e) {}
       },
+      ensureCtx() {
+        try {
+          if (!this.ctx) {
+            const AC = window.AudioContext || window.webkitAudioContext;
+            if (AC) this.ctx = new AC();
+          }
+          if (this.ctx && this.ctx.state === 'suspended') this.ctx.resume().catch(() => {});
+        } catch (e) {}
+        return this.ctx;
+      },
       play() {
         try { navigator.vibrate?.(14); } catch (e) {}
         this.tone(480, 'triangle', 0.07, 0.13, 0);
@@ -1227,6 +1257,143 @@
     // =========================================================================
     // 2. AVATAR & PROFILE CATALOG (16 SVG AVATARS, 6 FRAMES, 8 TITLES)
     // =========================================================================
+    // Muzyka tła: łagodne pady i pentatoniczna melodia generowane na żywo (bez plików audio).
+    const Music = {
+      playing: false,
+      vol: 0.5,
+      gain: null,
+      timer: null,
+      step: 0,
+      chords: [[57, 60, 64, 67], [53, 57, 60, 64], [60, 64, 67, 71], [55, 59, 62, 65]],
+      scale: [62, 64, 67, 69, 72, 74, 76],
+      target() { return 0.035 * this.vol + 0.0001; },
+      start() {
+        const ctx = SoundFX.ensureCtx();
+        if (!ctx || this.playing) return;
+        this.gain = ctx.createGain();
+        this.gain.gain.value = 0.0001;
+        this.gain.connect(ctx.destination);
+        this.gain.gain.exponentialRampToValueAtTime(this.target(), ctx.currentTime + 2.5);
+        this.playing = true;
+        this.bar();
+        this.timer = setInterval(() => this.bar(), 4000);
+      },
+      stop() {
+        if (!this.playing) return;
+        this.playing = false;
+        clearInterval(this.timer);
+        const g = this.gain;
+        const ctx = SoundFX.ctx;
+        if (g && ctx) {
+          g.gain.setTargetAtTime(0.0001, ctx.currentTime, 0.4);
+          setTimeout(() => { try { g.disconnect(); } catch (e) {} }, 1800);
+        }
+        this.gain = null;
+      },
+      setVolume(v) {
+        this.vol = Math.max(0, Math.min(1, v));
+        const ctx = SoundFX.ctx;
+        if (this.gain && ctx) this.gain.gain.setTargetAtTime(this.target(), ctx.currentTime, 0.2);
+      },
+      note(midi, t, dur, type, amp) {
+        const ctx = SoundFX.ctx;
+        if (!ctx || !this.gain) return;
+        const o = ctx.createOscillator();
+        const g = ctx.createGain();
+        o.type = type;
+        o.frequency.value = 440 * Math.pow(2, (midi - 69) / 12);
+        g.gain.setValueAtTime(0.0001, t);
+        g.gain.exponentialRampToValueAtTime(amp, t + 0.06);
+        g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+        o.connect(g);
+        g.connect(this.gain);
+        o.start(t);
+        o.stop(t + dur + 0.05);
+      },
+      bar() {
+        const ctx = SoundFX.ctx;
+        if (!ctx || !this.playing || !this.gain) return;
+        const t0 = ctx.currentTime + 0.05;
+        this.chords[this.step % this.chords.length].forEach(m => this.note(m - 12, t0, 3.8, 'triangle', 0.05));
+        for (let i = 0; i < 4; i++) {
+          if (Math.random() < 0.6) {
+            const pick = this.scale[Math.floor(Math.random() * this.scale.length)];
+            this.note(pick, t0 + 0.4 + i * 0.95 + Math.random() * 0.1, 1.1, 'sine', 0.04);
+          }
+        }
+        this.step += 1;
+      }
+    };
+
+    const AUDIO_KEY = 'asy_wasy_audio_v1';
+    const HISTORY_KEY = 'asy_wasy_history_v1';
+
+    function loadAudio() {
+      try {
+        const v = JSON.parse(localStorage.getItem(AUDIO_KEY) || 'null');
+        if (v && typeof v === 'object') return { music: Boolean(v.music), musicVol: typeof v.musicVol === 'number' ? v.musicVol : 0.5 };
+      } catch (e) {}
+      return { music: false, musicVol: 0.5 };
+    }
+
+    function loadHistory() {
+      try {
+        const v = JSON.parse(localStorage.getItem(HISTORY_KEY) || '[]');
+        return Array.isArray(v) ? v : [];
+      } catch (e) { return []; }
+    }
+
+    function saveHistory(list) {
+      try { localStorage.setItem(HISTORY_KEY, JSON.stringify(list.slice(0, 100))); } catch (e) {}
+    }
+
+    // Kopia zapasowa: statystyki, historia, ustawienia i profil w jednym pliku JSON.
+    const BACKUP_KEYS = [
+      'paw_deck_name', 'paw_deck_av', 'paw_deck_fr', 'paw_deck_title', 'paw_deck_muted',
+      'paw_deck_makao_rules_v2', 'asy_wasy_progress_v1', 'asy_wasy_history_v1',
+      'asy_wasy_difficulty_v1', 'asy_wasy_table_v1', 'asy_wasy_audio_v1'
+    ];
+    const BACKUP_JSON_KEYS = ['paw_deck_makao_rules_v2', 'asy_wasy_progress_v1', 'asy_wasy_history_v1', 'asy_wasy_audio_v1'];
+
+    function exportBackup() {
+      const data = {};
+      BACKUP_KEYS.forEach(k => {
+        try { const v = localStorage.getItem(k); if (v !== null) data[k] = v; } catch (e) {}
+      });
+      const payload = { app: 'asy-wasy', version: 1, exportedAt: new Date().toISOString(), data };
+      const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `asy-wasy-kopia-${new Date().toISOString().slice(0, 10)}.json`;
+      document.body.appendChild(a);
+      a.click();
+      setTimeout(() => { URL.revokeObjectURL(url); a.remove(); }, 500);
+    }
+
+    // Zwraca { ok: true } albo { ok: false, error }. Zapisuje tylko znane klucze i poprawny JSON.
+    function importBackupText(text) {
+      let parsed;
+      try { parsed = JSON.parse(text); } catch (e) { return { ok: false, error: 'To nie jest plik JSON.' }; }
+      if (!parsed || parsed.app !== 'asy-wasy' || !parsed.data || typeof parsed.data !== 'object') {
+        return { ok: false, error: 'To nie jest kopia zapasowa Asy & Wąsy.' };
+      }
+      const entries = Object.entries(parsed.data).filter(([k]) => BACKUP_KEYS.includes(k));
+      for (const [k, v] of entries) {
+        if (typeof v !== 'string') return { ok: false, error: `Nieprawidłowa wartość: ${k}` };
+        if (BACKUP_JSON_KEYS.includes(k)) {
+          try { JSON.parse(v); } catch (e) { return { ok: false, error: `Uszkodzone dane: ${k}` }; }
+        }
+      }
+      if (entries.length === 0) return { ok: false, error: 'Plik nie zawiera żadnych danych gry.' };
+      try {
+        entries.forEach(([k, v]) => localStorage.setItem(k, v));
+      } catch (e) {
+        return { ok: false, error: 'Nie udało się zapisać danych w przeglądarce.' };
+      }
+      return { ok: true };
+    }
+
     const AVATAR_FRAMES = {
       emerald: { name: 'Szmaragd', color: '#0F3D36' },
       coral: { name: 'Koral', color: '#E05A47' },
@@ -1256,7 +1423,7 @@
     ];
 
     const TABLE_THEMES = {
-      emerald: { name: 'Szmaragd', a: '#165249', b: '#0B463C', c: '#062923', edge: '#0A2924' },
+      emerald: { name: 'Zielony salon', a: '#5E8A70', b: '#46705A', c: '#2E4F3E', edge: '#273F33' },
       navy: { name: 'Granat', a: '#1F4068', b: '#15304F', c: '#0A1A2F', edge: '#081426' },
       burgundy: { name: 'Bordo', a: '#7A2233', b: '#5B1322', c: '#33091A', edge: '#260610' },
       slate: { name: 'Grafit', a: '#4A5568', b: '#2D3748', c: '#171E29', edge: '#101620' }
@@ -3038,11 +3205,25 @@
     // 4. UI COMPONENTS (AVATAR, CLASSIC WHITE PLAYING CARD, QR MODAL)
     // =========================================================================
     const BRAND_LOGO_SVG = `<svg viewBox="0 0 64 64" width="100%" height="100%" aria-hidden="true">
-        <path d="M9.500 23L7 4.500l16.500 8q8.500-2.500 17 0L57 4.500 54.500 23q4.500 7 4.500 15 0 22-27 22T5 38q0-8 4.500-15z" fill="#E84A3A"/>
-        <path d="M11.500 9.500l8 4-6.500 5.500zM52.500 9.500l-8 4 6.500 5.500z" fill="#F7A99F"/>
-        <path fill-rule="evenodd" d="M32 18.500L46 53h-6.700l-2.500-6.500h-9.600L24.700 53H18zM32 30.500l-3 10h6z" fill="#FFFDF8"/>
-        <ellipse cx="19.500" cy="30" rx="2.500" ry="3.200" fill="#141A18"/><ellipse cx="44.500" cy="30" rx="2.500" ry="3.200" fill="#141A18"/>
-        <g stroke="#FFFDF8" stroke-width="1.700" stroke-linecap="round"><path d="M20 41.500L8 39.500M19.500 46L8 48M44 41.500l12-2M44.500 46L56 48"/></g>
+        <rect width="64" height="64" rx="18" fill="#C46A4B"/>
+        <path d="M11 30 L12.5 9 L27 20 Z" fill="#F3E3B5" stroke="#2B2118" strokeWidth="1.6" strokeLinejoin="round"/>
+        <path d="M53 30 L51.5 9 L37 20 Z" fill="#F3E3B5" stroke="#2B2118" strokeWidth="1.6" strokeLinejoin="round"/>
+        <path d="M13.5 26 L14.2 14.5 L22.5 20.5 Z" fill="#E9A99A"/>
+        <path d="M50.5 26 L49.8 14.5 L41.5 20.5 Z" fill="#E9A99A"/>
+        <ellipse cx="32" cy="35" rx="21" ry="19" fill="#F3E3B5" stroke="#2B2118" strokeWidth="1.6"/>
+        <ellipse cx="23.5" cy="33.5" rx="4.2" ry="4.8" fill="#FFFDF8" stroke="#2B2118" strokeWidth="1.2"/>
+        <ellipse cx="40.5" cy="33.5" rx="4.2" ry="4.8" fill="#FFFDF8" stroke="#2B2118" strokeWidth="1.2"/>
+        <circle cx="24.4" cy="34.2" r="2.2" fill="#2B2118"/>
+        <circle cx="39.6" cy="34.2" r="2.2" fill="#2B2118"/>
+        <circle cx="25.2" cy="33.2" r=".7" fill="#FFFFFF"/>
+        <circle cx="40.4" cy="33.2" r=".7" fill="#FFFFFF"/>
+        <path d="M29.6 42.6h4.8L32 45.4z" fill="#D9736A" stroke="#2B2118" strokeWidth="0.8" strokeLinejoin="round"/>
+        <path d="M26.4 47.2q2.7 2.6 5.6 0q2.9 2.6 5.6 0" stroke="#2B2118" strokeWidth="1.5" fill="none" strokeLinecap="round"/>
+        <g stroke="#2B2118" strokeWidth="1.1" strokeLinecap="round"><path d="M16.5 41L8 39.5M16.8 44.2L8.5 45.6M47.5 41L56 39.5M47.2 44.2L55.5 45.6"/></g>
+        <g transform="rotate(14 50 50)">
+          <rect x="41.5" y="41" width="15" height="20.5" rx="2.6" fill="#FFFDF8" stroke="#2B2118" strokeWidth="1.1"/>
+          <text x="49" y="55" textAnchor="middle" fontFamily="Georgia, serif" fontWeight="900" fontSize="11" fill="#C46A4B">A</text>
+        </g>
       </svg>`;
 
     function BrandLogo({ size = 44 }) {
@@ -3615,6 +3796,10 @@
         try { const v = localStorage.getItem(TABLE_KEY); return TABLE_THEMES[v] ? v : 'emerald'; } catch (e) { return 'emerald'; }
       });
       const [celebration, setCelebration] = useState(null);
+      const [audio, setAudio] = useState(loadAudio);
+      const [history, setHistory] = useState(loadHistory);
+      const backupInputRef = useRef(null);
+      const [backupMsg, setBackupMsg] = useState(null);
       // Tytuł można nosić tylko odblokowany; w razie czego wraca się do „Nowicjusza”.
       useEffect(() => {
         const t = PLAYER_TITLES.find(x => x.name === playerTitle);
@@ -3830,12 +4015,42 @@
         if (room.isPassAndPlay) return;
         const r = roundResult(room, playerId);
         setProgress(prev => recordResult(prev, r));
+        const entry = {
+          id: `${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
+          at: Date.now(),
+          game: room.gameType,
+          result: r.result,
+          countsAsGame: r.countsAsGame,
+          mice: r.mice,
+          online: Boolean(room.isOnline),
+          round: room.round || 1,
+          matchOver: Boolean(room.winnerInfo.matchOver),
+          players: room.players.map(p => p.name).join(' — '),
+          reason: room.winnerInfo.reason || room.winnerInfo.winnerName || ''
+        };
+        setHistory(prev => {
+          const next = [entry, ...prev].slice(0, 100);
+          saveHistory(next);
+          return next;
+        });
         if (r.result === 'win') {
           setCelebration({ id: Date.now() });
           const t = setTimeout(() => setCelebration(null), 4200);
           return () => clearTimeout(t);
         }
       }, [room?.status, room?.winnerInfo, room?.round]);
+
+      // Muzyka tła: startuje dopiero po pierwszym dotknięciu (wymóg przeglądarek).
+      useEffect(() => {
+        try { localStorage.setItem(AUDIO_KEY, JSON.stringify(audio)); } catch (e) {}
+        Music.setVolume(audio.musicVol);
+        if (!audio.music) { Music.stop(); return; }
+        Music.start();
+        const kick = () => Music.start();
+        window.addEventListener('pointerdown', kick);
+        return () => window.removeEventListener('pointerdown', kick);
+      }, [audio.music]);
+      useEffect(() => { Music.setVolume(audio.musicVol); }, [audio.musicVol]);
 
       // Live Clock for Makao Turn Timer
       useEffect(() => {
@@ -4844,7 +5059,7 @@
             <svg viewBox="0 0 150 96" className="w-36 h-24" aria-hidden="true">
               <circle cx="75" cy="48" r="44" fill="#1F2A44" stroke="#D99B26" strokeWidth="3.5" />
               <circle cx="75" cy="48" r="37" fill="none" stroke="#D99B26" strokeWidth="1" strokeDasharray="1.5 3" strokeLinecap="round" />
-              <path d="M52 56c0-9 4-17 8-22l3-9 8 6c3-1 6-1 10 0l8-6 3 9c4 5 8 13 8 22 0 12-10 17-23 17s-23-5-23-17z" fill="#D99B26"/><ellipse cx="66" cy="55" rx="3" ry="3.8" fill="#1F2A44"/><ellipse cx="84" cy="55" rx="3" ry="3.8" fill="#1F2A44"/><path d="M73 62h4l-2 2.5z" fill="#1F2A44"/><path d="M50 62h-9M50 66l-9 2M100 62h9M100 66l9 2" stroke="#D99B26" strokeWidth="1.4" strokeLinecap="round"/>
+              <path d="M46 52l3-22 14 10q7-2 14 0l14-10 3 22q4 9-1 16-12 9-29 9-17 0-29-9-5-7-1-16z" fill="#E9A23B" stroke="#1F2A44" strokeWidth="1.4" strokeLinejoin="round"/><path d="M50 40l2-10 8 7M100 40l-2-10-8 7" fill="#F3C56B"/><ellipse cx="66" cy="56" rx="6.4" ry="7.2" fill="#FFFDF8" stroke="#1F2A44" strokeWidth="1.2"/><ellipse cx="84" cy="56" rx="6.4" ry="7.2" fill="#FFFDF8" stroke="#1F2A44" strokeWidth="1.2"/><circle cx="67" cy="57" r="3.4" fill="#1F2A44"/><circle cx="85" cy="57" r="3.4" fill="#1F2A44"/><circle cx="68" cy="55.8" r="1" fill="#FFFFFF"/><circle cx="86" cy="55.8" r="1" fill="#FFFFFF"/><path d="M72 66h6l-3 3.2z" fill="#E07A6A" stroke="#1F2A44" strokeWidth="0.8" strokeLinejoin="round"/><path d="M69 71.5q3 2.8 6 0q3 2.8 6 0" stroke="#1F2A44" strokeWidth="1.6" fill="none" strokeLinecap="round"/><g stroke="#1F2A44" strokeWidth="1.2" strokeLinecap="round"><path d="M56 66L46 64M56 70L46 72M94 66l10-2M94 70l10 2"/></g>
               <path d="M30 80h20l6-8 6 8h20" fill="none" stroke="#D99B26" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" opacity="0.8"/><path d="M96 80h24" fill="none" stroke="#D99B26" strokeWidth="1.4" strokeLinecap="round" opacity="0.8"/>
             </svg>
           )
@@ -6054,6 +6269,94 @@
                 </div>
 
                 <div>
+                  <span className="text-xs font-extrabold text-[#66736E] block mb-2">Dźwięk</span>
+                  <div className="p-3 rounded-2xl bg-[#F7F5F0] border border-[#E5E2DC] space-y-2.5">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-extrabold text-[#18221F]">Muzyka tła</span>
+                      <button role="switch" aria-checked={audio.music} onClick={() => setAudio(a => ({ ...a, music: !a.music }))} className={`switch ${audio.music ? 'on' : ''}`} aria-label="Muzyka tła" />
+                    </div>
+                    <label className="block">
+                      <span className="flex items-center justify-between text-[11px] font-bold text-[#586560]">
+                        <span>Głośność muzyki</span><span>{Math.round(audio.musicVol * 100)}%</span>
+                      </span>
+                      <input
+                        type="range"
+                        min={0}
+                        max={100}
+                        value={Math.round(audio.musicVol * 100)}
+                        onChange={e => setAudio(a => ({ ...a, musicVol: Number(e.target.value) / 100 }))}
+                        className="w-full accent-[#0B463C]"
+                      />
+                    </label>
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-extrabold text-[#18221F]">Dźwięki i wibracje</span>
+                      <button role="switch" aria-checked={!muted} onClick={toggleMute} className={`switch ${muted ? '' : 'on'}`} aria-label="Dźwięki i wibracje" />
+                    </div>
+                  </div>
+                </div>
+
+                <div>
+                  <span className="text-xs font-extrabold text-[#66736E] block mb-2">Historia partii</span>
+                  {history.length === 0 ? (
+                    <p className="text-[11px] font-semibold text-[#586560] p-3 rounded-2xl bg-[#F7F5F0] border border-[#E5E2DC]">
+                      Tu pojawią się Twoje ostatnie rundy. Zagraj pierwszą!
+                    </p>
+                  ) : (
+                    <ul className="space-y-1.5">
+                      {history.slice(0, 12).map(h => {
+                        const label = h.result === 'win' ? 'Wygrana' : h.result === 'loss' ? 'Przegrana' : h.result === 'draw' ? 'Remis' : 'Runda';
+                        const tone = h.result === 'win' ? 'bg-[#DCFCE7] text-[#065F46]' : h.result === 'loss' ? 'bg-[#FEE2E2] text-[#991B1B]' : 'bg-[#EFECE3] text-[#586560]';
+                        const gameName = { makao: 'Makao', saboteur: 'Kocia Ekipa', rummy: 'Remik' }[h.game] || h.game;
+                        return (
+                          <li key={h.id} className="p-2.5 rounded-2xl bg-[#F7F5F0] border border-[#E5E2DC]">
+                            <div className="flex items-center justify-between gap-2">
+                              <span className="text-xs font-extrabold text-[#18221F] truncate">{gameName}{h.online ? ' • online' : ''}{h.matchOver ? ' • mecz' : ''}</span>
+                              <span className={`text-[10px] font-black px-2 py-0.5 rounded-full flex-shrink-0 ${tone}`}>{label}</span>
+                            </div>
+                            <div className="text-[10px] font-semibold text-[#66736E] truncate mt-0.5">{h.players}</div>
+                            <div className="text-[10px] font-semibold text-[#586560] truncate">{h.reason}</div>
+                            <div className="text-[9px] font-bold text-[#8A9590] mt-0.5">{new Date(h.at).toLocaleDateString('pl-PL', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}</div>
+                          </li>
+                        );
+                      })}
+                    </ul>
+                  )}
+                </div>
+
+                <div>
+                  <span className="text-xs font-extrabold text-[#66736E] block mb-2">Kopia zapasowa</span>
+                  <p className="text-[10px] font-semibold text-[#586560] mb-2">
+                    Zapisz statystyki, historię i ustawienia do pliku, a potem wczytaj je na innym urządzeniu.
+                  </p>
+                  <div className="grid grid-cols-2 gap-2">
+                    <button onClick={exportBackup} className="tactile-btn btn-paper text-xs py-2.5">Eksportuj do pliku</button>
+                    <button onClick={() => backupInputRef.current && backupInputRef.current.click()} className="tactile-btn btn-paper text-xs py-2.5">Importuj z pliku</button>
+                    <input
+                      ref={backupInputRef}
+                      type="file"
+                      accept="application/json,.json"
+                      className="hidden"
+                      onChange={async e => {
+                        const file = e.target.files && e.target.files[0];
+                        e.target.value = '';
+                        if (!file) return;
+                        const text = await file.text();
+                        const res = importBackupText(text);
+                        if (!res.ok) { setBackupMsg({ ok: false, text: res.error }); return; }
+                        if (window.confirm('Zaimportować kopię? Obecne statystyki i ustawienia zostaną zastąpione.')) {
+                          window.location.reload();
+                        } else {
+                          setBackupMsg({ ok: false, text: 'Import anulowany — nic nie zmieniono.' });
+                        }
+                      }}
+                    />
+                  </div>
+                  {backupMsg && (
+                    <p className={`text-[11px] font-bold mt-2 ${backupMsg.ok ? 'text-[#065F46]' : 'text-[#B91C1C]'}`}>{backupMsg.text}</p>
+                  )}
+                </div>
+
+                <div>
                   <span className="text-xs font-extrabold text-[#66736E] block mb-2">Tytuł (odblokowujesz go grą)</span>
                   <div className="grid grid-cols-2 gap-1.5">
                     {PLAYER_TITLES.map(t => {
@@ -6547,6 +6850,15 @@
                       <span className="block text-[11px] font-semibold text-[#586560]">{muted ? 'Wyłączone' : 'Włączone'}</span>
                     </span>
                     <span className={`switch ${muted ? '' : 'on'}`} />
+                  </button>
+
+                  <button className="menu-row" role="switch" aria-checked={audio.music} onClick={() => setAudio(a => ({ ...a, music: !a.music }))}>
+                    <span className="menu-row-icon font-serif-display font-black text-[#0B463C]">♪</span>
+                    <span className="flex-1 min-w-0">
+                      <span className="block text-sm font-extrabold text-[#141A18]">Muzyka tła</span>
+                      <span className="block text-[11px] font-semibold text-[#586560]">{audio.music ? 'Włączona' : 'Wyłączona'}</span>
+                    </span>
+                    <span className={`switch ${audio.music ? 'on' : ''}`} />
                   </button>
 
                   {room?.isOnline && (

@@ -1,6 +1,6 @@
 // Asy & Wąsy — service worker: dzięki niemu aplikacja instaluje się i działa bez internetu.
 // Po każdej zmianie plików gry podbij numer wersji, żeby telefony pobrały nową wersję.
-const VERSION = 'paw-deck-v5.5.0';
+const VERSION = 'paw-deck-v5.6.0';
 const SHELL_CACHE = `${VERSION}-shell`;
 const CDN_CACHE = `${VERSION}-cdn`;
 

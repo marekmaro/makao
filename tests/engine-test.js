@@ -28,13 +28,13 @@ t('basic matching + queen on everything', () => {
 t('defending an attack needs a matching attack card', () => {
   const st = base(P(2), c('2', 'hearts'), {}, { pendingDraw: 2 });
   assert(E.canPlayMakaoCard(c('2', 'spades'), st, R)); assert(E.canPlayMakaoCard(c('3', 'hearts'), st, R));
-  assert(!E.canPlayMakaoCard(c('3', 'spades'), st, R)); assert(E.canPlayMakaoCard(c('K', 'hearts'), st, R));
+  assert(E.canPlayMakaoCard(c('3', 'spades'), st, R), 'classic: 3 defends 2 of any suit'); assert(!E.canPlayMakaoCard(c('K', 'hearts'), st, R), 'kings defend only with kings');
   assert(!E.canPlayMakaoCard(c('K', 'spades'), st, R)); assert(!E.canPlayMakaoCard(c('7', 'hearts'), st, R));
   assert(!E.canPlayMakaoCard(c('Q', 'hearts'), st, R)); assert(!E.canPlayMakaoCard(c('K', 'diamonds'), st, R));
   assert(!E.canPlayMakaoCard(c('Q', 'spades'), st, R)); assert(E.canPlayMakaoCard(c('Q', 'spades'), st, { ...R, queenSpadesShield: true }));
   assert(!E.canPlayMakaoCard(c('2', 'spades'), st, { ...R, stackDraw: false }));
   const k = base(P(2), c('K', 'spades'), {}, { pendingDraw: 5 });
-  assert(E.canPlayMakaoCard(c('K', 'hearts'), k, R)); assert(E.canPlayMakaoCard(c('2', 'spades'), k, R)); assert(!E.canPlayMakaoCard(c('2', 'hearts'), k, R));
+  assert(E.canPlayMakaoCard(c('K', 'hearts'), k, R)); assert(!E.canPlayMakaoCard(c('2', 'spades'), k, R)); assert(E.canPlayMakaoCard(c('K', 'hearts'), k, R));
 });
 t('penalties stack and are drawn', () => {
   const pl = P(2); const two = c('2', 'hearts', 'a'); const three = c('3', 'hearts', 'b');

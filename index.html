@@ -775,6 +775,171 @@
     .count-card-alert .count-num {
       color: #FFFFFF;
     }
+    /* ---------- miejsca przy stole ---------- */
+    .seats {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 8px;
+      padding-top: 6px;
+    }
+    .seats-1, .seats-2 {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+    .seat {
+      position: relative;
+      min-width: 0;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 3px;
+      padding: 8px 6px 7px;
+      border-radius: 20px;
+      background: rgba(255, 255, 255, 0.78);
+      border: 1.5px solid #E2DDD2;
+      box-shadow: 0 2px 0 #E2DDD2;
+      transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
+      cursor: pointer;
+    }
+    .seat-me {
+      background: #FFFFFF;
+      border-color: #0B463C;
+    }
+    .seat-turn {
+      border-color: #D99B26;
+      background: #FFFFFF;
+      box-shadow: 0 0 0 3px rgba(217, 155, 38, 0.22), 0 2px 0 #E2DDD2;
+      transform: translateY(-2px);
+    }
+    .seat-target {
+      box-shadow: 0 0 0 3px #E84A3A;
+    }
+    .seat-avatar {
+      position: relative;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .seat-badge {
+      position: absolute;
+      right: -6px;
+      bottom: -4px;
+      font-size: 11px;
+      line-height: 1;
+      background: #FFFFFF;
+      border-radius: 99px;
+      padding: 2px 3px;
+      box-shadow: 0 1px 2px rgba(0, 0, 0, 0.18);
+    }
+    .seat-pulse {
+      position: absolute;
+      inset: -5px;
+      border-radius: 99px;
+      border: 2px solid #D99B26;
+      animation: seatPulse 1.4s ease-out infinite;
+      pointer-events: none;
+    }
+    @keyframes seatPulse {
+      0% { transform: scale(0.92); opacity: 0.9; }
+      100% { transform: scale(1.18); opacity: 0; }
+    }
+    .seat-name {
+      max-width: 100%;
+      font-size: 11.5px;
+      font-weight: 800;
+      color: #141A18;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .seat-cards {
+      display: flex;
+      align-items: center;
+      gap: 5px;
+      height: 22px;
+    }
+    .seat-stack {
+      position: relative;
+      width: 20px;
+      height: 22px;
+      flex-shrink: 0;
+    }
+    .mini-back {
+      position: absolute;
+      left: calc(var(--i) * 3px);
+      top: calc(var(--i) * -1px);
+      width: 13px;
+      height: 18px;
+      border-radius: 3px;
+      background: repeating-linear-gradient(45deg, #0B463C 0 3px, #134F43 3px 6px);
+      border: 1px solid #FFFFFF;
+      box-shadow: 0 1px 2px rgba(0, 0, 0, 0.22);
+    }
+    .seat-count {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 15px;
+      font-weight: 800;
+      line-height: 1;
+      min-width: 22px;
+      height: 22px;
+      padding: 0 5px;
+      border-radius: 8px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      color: #FDE68A;
+      background: #0B463C;
+      animation: popInspect 0.22s cubic-bezier(.22,1,.36,1);
+    }
+    .seat-cards.tone-low .seat-count {
+      background: #B7791F;
+      color: #FFFFFF;
+    }
+    .seat-cards.tone-alert .seat-count {
+      background: #E84A3A;
+      color: #FFFFFF;
+      animation: makaoPulse 0.75s infinite;
+    }
+    .seat-cards.tone-said .seat-count {
+      background: #FEF3C7;
+      color: #92400E;
+    }
+    .seats-4 .seat, .seats-5 .seat, .seats-6 .seat {
+      padding: 6px 4px 5px;
+      gap: 2px;
+    }
+    .seats-4 .seat-avatar > *:first-child, .seats-5 .seat-avatar > *:first-child, .seats-6 .seat-avatar > *:first-child {
+      transform: scale(0.86);
+    }
+    .seats-4 .seat-avatar, .seats-5 .seat-avatar, .seats-6 .seat-avatar {
+      height: 38px;
+    }
+    .seat-status {
+      font-size: 10px;
+      font-weight: 700;
+      color: #586560;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      max-width: 100%;
+    }
+    .seat-bubble {
+      position: absolute;
+      top: -30px;
+      left: 50%;
+      transform: translateX(-50%);
+      z-index: 30;
+      max-width: 150px;
+      padding: 3px 8px;
+      border-radius: 10px;
+      color: #FFFFFF;
+      font-size: 10px;
+      font-weight: 800;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      pointer-events: none;
+    }
+
     .stop-makao-btn {
       background: #141A18;
       color: #FFFFFF;
@@ -2115,8 +2280,10 @@
         if (rules.queenSpadesShield && card.rank === 'Q' && card.suit === 'spades') return true;
         if (!rules.stackDraw) return false;
         if (!isMakaoAttack(card, rules)) return false;
+        // Klasycznie: dwójka i trójka przebijają się nawzajem bez względu na kolor; króle bojowe — królami.
         if (card.rank === 'JOKER' || topCard.rank === 'JOKER') return true;
-        return card.suit === topCard.suit || card.rank === topCard.rank;
+        if (isWarKing(topCard, rules)) return isWarKing(card, rules);
+        return card.rank === '2' || card.rank === '3';
       }
 
       // 2) Trwa czekanie po czwórce — przebija tylko kolejna czwórka.
@@ -4919,8 +5086,18 @@
         executeMakaoPlayCard(activePlayerId, ids, null);
       };
 
+      const lastTapRef = useRef({ id: null, at: 0 });
       const handleMakaoCardClick = (card) => {
         const curr = roomRef.current;
+        // Dwa szybkie dotknięcia tej samej, grywalnej karty = zagranie jednej karty bez wyboru.
+        const now = Date.now();
+        const doubleTap = lastTapRef.current.id === card.id && now - lastTapRef.current.at < 450;
+        lastTapRef.current = { id: card.id, at: now };
+        if (doubleTap && curr?.makao && curr.status === 'playing' && curr.players[curr.makao.currentTurnIdx]?.id === activePlayerId && canPlayMakaoCard(card, curr.makao, curr.makaoRules)) {
+          setMakaoPick([]);
+          playMakaoCards([card.id]);
+          return;
+        }
         if (!curr || curr.status !== 'playing' || !curr.makao) return;
         const ms = curr.makao;
         const rules = curr.makaoRules;
@@ -5756,8 +5933,8 @@
                 </div>
               </div>
 
-              {/* Opponents Strip (Detailed Card Count + Catch Makao Button) */}
-              <div className="flex items-center gap-2 overflow-x-auto py-1 px-0.5" style={{ scrollbarWidth: 'none' }}>
+              {/* Miejsca przy stole: rywale w siatce (bez przewijania), z kółkiem, nickiem i liczbą kart */}
+              <div className={`seats seats-${Math.min(room.players.length, 6)}`}>
                 {room.players.map((p, idx) => {
                   const gState = room.gameType === 'makao' ? room.makao : room.gameType === 'saboteur' ? room.saboteur : room.rummy;
                   const isTurn = gState?.currentTurnIdx === idx && room.status === 'playing';
@@ -5766,56 +5943,53 @@
                   const isBrokenClaw = room.gameType === 'saboteur' && room.saboteur?.brokenClaws?.[p.id];
                   const isOneCardAlert = room.gameType === 'makao' && cardsCount === 1 && room.status === 'playing';
                   const saidIt = Boolean(room.makao?.saidMakao?.[p.id]);
+                  const isMe = p.id === activePlayerId;
+                  const tone = isOneCardAlert ? (saidIt ? 'said' : 'alert') : cardsCount <= 2 && room.gameType === 'makao' ? 'low' : 'normal';
+                  const targeting = sabActionTargetMode === 'break_claw' || sabActionTargetMode === 'fix_claw';
 
                   return (
                     <div
                       key={p.id}
                       onClick={() => {
-                        if (sabActionTargetMode === 'break_claw' || sabActionTargetMode === 'fix_claw') {
+                        if (targeting) {
                           const card = room.saboteur.hands[activePlayerId]?.find(c => c.id === selectedCardId);
                           if (card) executeSabAction(activePlayerId, card, p.id);
-                        } else if (p.id !== activePlayerId && !room.isPassAndPlay) {
+                        } else if (!isMe && !room.isPassAndPlay) {
                           SoundFX.inspect();
                           setPokeTarget(p);
                         }
                       }}
-                      className={`relative flex items-center gap-2.5 px-3 py-2 rounded-2xl border transition flex-shrink-0 ${
-                        isTurn
-                          ? 'bg-white border-2 border-[#D99B26] shadow-md'
-                          : 'bg-white/85 border-[#E5E2DC]'
-                      } ${(sabActionTargetMode === 'break_claw' || sabActionTargetMode === 'fix_claw') ? 'cursor-pointer ring-2 ring-[#E05A47]' : ''}`}
+                      className={`seat ${isTurn ? 'seat-turn' : ''} ${isMe ? 'seat-me' : ''} ${targeting ? 'seat-target' : ''}`}
                     >
                       {bubble && (
                         <div
                           key={bubble.id}
-                          className={`chat-pop-bubble absolute inset-0 z-30 px-3 rounded-2xl text-white text-xs font-bold flex items-center justify-center text-center leading-tight overflow-hidden pointer-events-none ${bubble.hit ? 'bg-[#E84A3A] chip-hit' : 'bg-[#141A18]'}`}
+                          className={`seat-bubble chat-pop-bubble ${bubble.hit ? 'bg-[#E84A3A] chip-hit' : 'bg-[#141A18]'}`}
                         >
-                          <span className="line-clamp-2">{bubble.hit ? '' : '💬 '}{bubble.text}</span>
+                          {bubble.hit ? '' : '💬 '}{bubble.text}
                         </div>
                       )}
-                      <PlayerAvatar avatarId={p.avatarId} frameId={p.frameId} size={34} badge={isBrokenClaw ? '🩹' : p.isBot ? '🤖' : null} />
-                      <div className="leading-tight min-w-0">
-                        <span className="block text-xs font-extrabold text-[#141A18] max-w-[86px] truncate">
-                          {p.id === activePlayerId ? 'Ty' : p.name}
-                        </span>
-                        {isOneCardAlert ? (
-                          <span className={`inline-block mt-0.5 text-[10px] font-black px-1.5 py-0.5 rounded-md ${saidIt ? 'bg-[#FEF3C7] text-[#92400E]' : 'bg-[#FEE2E2] text-[#B91C1C]'}`}>
-                            {saidIt ? '📣 MAKAO!' : 'ostatnia karta'}
-                          </span>
-                        ) : (
-                          <span className="block mt-0.5 text-[10px] font-bold text-[#586560]">
-                            {isTurn ? '● ruch' : `${p.score || 0} 🏆`}
-                          </span>
+                      <div className="seat-avatar">
+                        <PlayerAvatar avatarId={p.avatarId} frameId={p.frameId} size={44} />
+                        {(isBrokenClaw || p.isBot) && (
+                          <span className="seat-badge">{isBrokenClaw ? '🩹' : '🤖'}</span>
                         )}
+                        {isTurn && <span className="seat-pulse" aria-hidden="true" />}
                       </div>
-
-                      {/* Liczba kart w ręce — duża, na rewersie karty */}
-                      <div
-                        className={`count-card ${isOneCardAlert ? 'count-card-alert' : cardsCount <= 3 && room.gameType === 'makao' ? 'count-card-low' : ''}`}
-                        aria-label={`${cardsCount} ${cardsCount === 1 ? 'karta' : plCards(cardsCount)} w ręce`}
-                      >
-                        <span key={cardsCount} className="count-num">{cardsCount}</span>
+                      <div className="seat-name">{isMe ? 'Ty' : p.name}</div>
+                      <div className={`seat-cards tone-${tone}`} aria-label={`${cardsCount} ${plCards(cardsCount)} w ręce`}>
+                        <span className="seat-stack" aria-hidden="true">
+                          {Array.from({ length: Math.min(cardsCount, 3) }).map((_, i) => (
+                            <span key={i} className="mini-back" style={{ '--i': i }} />
+                          ))}
+                        </span>
+                        <span key={cardsCount} className="seat-count">{cardsCount}</span>
                       </div>
+                      {(isOneCardAlert || isTurn) && (
+                        <div className="seat-status">
+                          {isOneCardAlert ? (saidIt ? 'MAKAO!' : 'ostatnia!') : 'ruch'}
+                        </div>
+                      )}
                     </div>
                   );
                 })}
@@ -5875,7 +6049,7 @@
                 return (
                   <div className="flex-1 flex flex-col justify-between gap-2.5">
                     {/* Stół */}
-                    <div className="emerald-table p-3.5 flex-1 flex flex-col justify-between min-h-[250px]">
+                    <div className="emerald-table p-3.5 flex-1 flex flex-col justify-between min-h-[210px]">
                       <div className="flex items-center justify-between gap-2 text-xs">
                         <span className="px-2.5 py-1 rounded-full bg-black/25 font-bold text-[#F7F5F0] truncate" aria-live="polite">
                           {ms.lastEvent}
@@ -6840,7 +7014,7 @@
                           )}
                           <div className="rule-row">
                             <span className="rule-chip">2 · 3</span>
-                            <span>Następny gracz dobiera 2 lub 3 karty{rules.stackDraw ? ' — chyba że przebije 2, 3 lub królem bojowym w tym samym kolorze albo tej samej figurze (kary się sumują)' : ''}.</span>
+                            <span>Następny gracz dobiera 2 lub 3 karty{rules.stackDraw ? ' — chyba że przebije kartą 2 lub 3 (dowolnego koloru); króla bojowego przebija tylko król bojowy (kary się sumują)' : ''}.</span>
                           </div>
                           {rules.skipFour && (
                             <div className="rule-row">

@@ -41,7 +41,7 @@ wszystkie pliki z tego repozytorium.
 
 ### Aktualizacja gry
 
-Po każdej zmianie plików podbij numer w `sw.js` (`const VERSION = 'paw-deck-v5.7.0'`). Telefony pobiorą
+Po każdej zmianie plików podbij numer w `sw.js` (`const VERSION = 'paw-deck-v5.8.0'`). Telefony pobiorą
 nową wersję przy następnym otwarciu aplikacji z internetem.
 
 ## Gra online i czat (Firebase)
@@ -80,7 +80,7 @@ Dostęp do danych ograniczają reguły z punktu 3.
 - **Kilka kart naraz:** karty tej samej figury (np. 7♥ i 7♠) można położyć w jednym ruchu. Pierwsza musi
   pasować do stosu, ostatnia zostaje na wierzchu; kary i postoje się sumują.
 - **2 i 3:** następny gracz dobiera 2 lub 3 karty. Karę można przebić własną 2, 3 lub królem bojowym
-  (w tym samym kolorze albo tej samej figurze) — kary się sumują.
+  (dowolnego koloru) — kary się sumują. Króla bojowego przebija tylko król bojowy.
 - **4:** następny gracz czeka kolejkę; może przebić własną czwórką.
 - **Walet:** żąda figury 5–10. Żądanie obowiązuje wszystkich przez jedną kolejkę, także żądającego.
 - **As:** zmienia kolor.

@@ -41,7 +41,7 @@ wszystkie pliki z tego repozytorium.
 
 ### Aktualizacja gry
 
-Po każdej zmianie plików podbij numer w `sw.js` (`const VERSION = 'paw-deck-v4.1.0'`). Telefony pobiorą
+Po każdej zmianie plików podbij numer w `sw.js` (`const VERSION = 'paw-deck-v4.2.0'`). Telefony pobiorą
 nową wersję przy następnym otwarciu aplikacji z internetem.
 
 ## Gra online i czat (Firebase)
@@ -77,6 +77,8 @@ Dostęp do danych ograniczają reguły z punktu 3.
 
 - Dokładasz kartę w tym samym kolorze albo o tej samej figurze. Nie masz ruchu — dobierasz kartę;
   jeśli pasuje, możesz ją od razu zagrać.
+- **Kilka kart naraz:** karty tej samej figury (np. 7♥ i 7♠) można położyć w jednym ruchu. Pierwsza musi
+  pasować do stosu, ostatnia zostaje na wierzchu; kary i postoje się sumują.
 - **2 i 3:** następny gracz dobiera 2 lub 3 karty. Karę można przebić własną 2, 3 lub królem bojowym
   (w tym samym kolorze albo tej samej figurze) — kary się sumują.
 - **4:** następny gracz czeka kolejkę; może przebić własną czwórką.
@@ -84,7 +86,8 @@ Dostęp do danych ograniczają reguły z punktu 3.
 - **As:** zmienia kolor.
 - **Król kier:** następny gracz dobiera 5 kart. **Król pik:** 5 kart dobiera poprzedni gracz.
 - **Dama:** na wszystko i wszystko na damę (poza karą, postojem i żądaniem waleta).
-- **MAKAO!:** z jedną kartą trzeba kliknąć „MAKAO!”. Kto zapomni, dobiera 5 kart, gdy rywal go przyłapie.
+- **MAKAO! i STOP MAKAO!:** z jedną kartą trzeba kliknąć „MAKAO!” (można to zapowiedzieć tuż przed ruchem).
+  Kto zapomni, dobiera 5 kart, gdy rywal kliknie „STOP MAKAO!”. Boty też to robią — po ok. 2,5 sekundy.
 - Talia: 52 karty, od 4 graczy dwie talie. Na start 5 kart.
 
 Warianty do włączenia w „Zasady i warianty”: tarcza damy pik, jokery, 7 kart na start, limit czasu na ruch

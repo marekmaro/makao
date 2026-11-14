@@ -16,7 +16,7 @@ const base = (players, top, hands, extra = {}) => ({
 let n = 0; const t = (name, fn) => { fn(); n++; console.log('ok  ' + name); };
 
 t('defaults are classic', () => {
-  assert.deepStrictEqual({ ...R }, { stackDraw: true, skipFour: true, warKings: true, queenAll: true, queenSpadesShield: false, useJokers: false, catchMakao: true, deckMode: 'auto', initialHandSize: 5, turnTime: 30 });
+  assert.deepStrictEqual({ ...R }, { stackDraw: true, skipFour: true, warKings: true, queenAll: true, queenSpadesShield: false, useJokers: false, catchMakao: true, multiPlay: true, deckMode: 'auto', initialHandSize: 5, turnTime: 30 });
 });
 t('basic matching + queen on everything', () => {
   const st = base(P(2), c('7', 'hearts'), {});
@@ -100,6 +100,42 @@ t('MAKAO: announce in advance, forget -> caught, bots announce', () => {
   st = E.applyMakaoPlay(pl, st, R, 'p1', 'b').state; assert.strictEqual(st.saidMakao.p1, true);
   assert.strictEqual(E.makaoCatchTargets(pl, st, { ...R, catchMakao: false }, 'p0').length, 0);
 });
+t('several cards of one rank in a single move', () => {
+  const pl = P(2);
+  const mk = (hand, top, extra) => base(pl, top, { p0: hand, p1: [c('5', 'clubs'), c('6', 'clubs')] }, extra);
+  // 7♥ pasuje do stosu, 7♠ i 7♣ idą razem z nią; na wierzchu zostaje ostatnia
+  let st = mk([c('7', 'hearts', 'a'), c('7', 'spades', 'b'), c('7', 'clubs', 'd'), c('9', 'diamonds')], c('9', 'hearts'));
+  let r = E.applyMakaoPlay(pl, st, R, 'p0', ['a', 'b', 'd']);
+  assert(r && !r.won); assert.strictEqual(r.state.hands.p0.length, 1); assert.strictEqual(r.state.discardPile.slice(-1)[0].id, 'd'); assert.strictEqual(r.state.discardPile.length, 5);
+  // pierwsza karta musi pasować do stosu
+  assert.strictEqual(E.applyMakaoPlay(pl, st, R, 'p0', ['b', 'a']), null);
+  // różne figury, powtórzona karta, wyłączona zasada
+  st = mk([c('7', 'hearts', 'a'), c('8', 'hearts', 'x'), c('7', 'spades', 'b')], c('9', 'hearts'));
+  assert.strictEqual(E.applyMakaoPlay(pl, st, R, 'p0', ['a', 'x']), null); assert.strictEqual(E.applyMakaoPlay(pl, st, R, 'p0', ['a', 'a']), null);
+  assert.strictEqual(E.applyMakaoPlay(pl, st, { ...R, multiPlay: false }, 'p0', ['a', 'b']), null); assert(E.applyMakaoPlay(pl, st, { ...R, multiPlay: false }, 'p0', ['a']));
+  // kary i postoje się sumują
+  st = mk([c('2', 'hearts', 'a'), c('2', 'spades', 'b'), c('9', 'clubs')], c('9', 'hearts'));
+  assert.strictEqual(E.applyMakaoPlay(pl, st, R, 'p0', ['a', 'b']).state.pendingDraw, 4);
+  st = mk([c('3', 'hearts', 'a'), c('3', 'spades', 'b'), c('3', 'clubs', 'd'), c('9', 'clubs')], c('2', 'hearts'), { pendingDraw: 2 });
+  assert.strictEqual(E.applyMakaoPlay(pl, st, R, 'p0', ['a', 'b', 'd']).state.pendingDraw, 11);
+  st = mk([c('4', 'hearts', 'a'), c('4', 'spades', 'b'), c('9', 'clubs')], c('9', 'hearts'));
+  assert.strictEqual(E.applyMakaoPlay(pl, st, R, 'p0', ['a', 'b']).state.pendingSkip, 2);
+  // dwa króle bojowe: +10, cel wskazuje ostatni; zwykły król nie dodaje kary
+  const p3 = P(3);
+  let k = base(p3, c('9', 'hearts'), { p0: [c('5', 'clubs')], p1: [c('K', 'hearts', 'kh'), c('K', 'spades', 'ks'), c('K', 'diamonds', 'kd'), c('6', 'clubs')], p2: [c('5', 'spades')] }, { currentTurnIdx: 1 });
+  r = E.applyMakaoPlay(p3, k, R, 'p1', ['kh', 'ks']); assert.strictEqual(r.state.pendingDraw, 10); assert.strictEqual(r.state.currentTurnIdx, 0);
+  r = E.applyMakaoPlay(p3, k, R, 'p1', ['kh', 'kd']); assert.strictEqual(r.state.pendingDraw, 5); assert.strictEqual(r.state.currentTurnIdx, 2);
+  // as: jedno żądanie koloru; ostatnie dwie karty tej samej figury kończą partię
+  st = mk([c('A', 'hearts', 'a'), c('A', 'spades', 'b'), c('9', 'clubs')], c('9', 'hearts'));
+  assert.strictEqual(E.applyMakaoPlay(pl, st, R, 'p0', ['a', 'b'], 'clubs').state.demandedSuit, 'clubs');
+  st = mk([c('7', 'hearts', 'a'), c('7', 'spades', 'b')], c('9', 'hearts'));
+  assert(E.applyMakaoPlay(pl, st, R, 'p0', ['a', 'b']).won);
+  assert.deepStrictEqual(E.chooseMakaoBotMove(pl, st, R, 'p0').cardIds.sort(), ['a', 'b'], 'bot finishes with a pair');
+  // po dobraniu: dobrana karta + takie same z ręki
+  st = mk([c('7', 'spades', 'old'), c('9', 'clubs')], c('8', 'hearts')); st.deck = [c('7', 'hearts', 'new')];
+  st = E.applyMakaoDraw(pl, st, R, 'p0'); assert.strictEqual(st.drawnCardId, 'new');
+  assert(E.applyMakaoPlay(pl, st, R, 'p0', ['new', 'old'])); assert.strictEqual(E.applyMakaoPlay(pl, st, R, 'p0', ['old', 'new']), null);
+});
 t('winning + illegal moves', () => {
   const pl = P(2); const st = base(pl, c('7', 'hearts'), { p0: [c('9', 'hearts', 'a')], p1: [c('5', 'clubs', 'z')] });
   const r = E.applyMakaoPlay(pl, st, R, 'p0', 'a'); assert(r.won); assert.strictEqual(r.state.hands.p0.length, 0);
@@ -110,10 +146,10 @@ t('deck count + plural', () => {
   assert.deepStrictEqual([1, 2, 5, 12, 22, 25].map(E.plCards), ['kartę', 'karty', 'kart', 'kart', 'karty', 'kart']);
 });
 t('simulation: 4000 full games never stall or lose cards', () => {
-  let maxSteps = 0, totalSteps = 0, catches = 0, emergency = 0; const wins = {};
+  let maxSteps = 0, totalSteps = 0, catches = 0, emergency = 0, multi = 0; const wins = {};
   for (let g = 0; g < 4000; g++) {
     const np = 2 + (g % 5);
-    const rules = { ...R }; ['stackDraw', 'skipFour', 'warKings', 'queenAll', 'queenSpadesShield', 'useJokers', 'catchMakao'].forEach(k => { if (g % 3 === 0) rules[k] = Math.random() < 0.5; });
+    const rules = { ...R }; ['stackDraw', 'skipFour', 'warKings', 'queenAll', 'queenSpadesShield', 'useJokers', 'catchMakao', 'multiPlay'].forEach(k => { if (g % 3 === 0) rules[k] = Math.random() < 0.5; });
     rules.initialHandSize = g % 2 ? 5 : 7;
     const pl = P(np).map((p, i) => ({ ...p, isBot: i !== 0 }));
     let st = E.initMakaoState(pl, rules);
@@ -128,7 +164,7 @@ t('simulation: 4000 full games never stall or lose cards', () => {
       if (!cur.isBot && st.hands[cur.id].length === 2 && Math.random() < 0.5) st = E.applyMakaoSayMakao(pl, st, cur.id);
       const mv = E.chooseMakaoBotMove(pl, st, rules, cur.id);
       const cardsBefore = Object.values(st.hands).reduce((s, h) => s + h.length, 0) + st.deck.length + st.discardPile.length;
-      if (mv.type === 'play') { const r = E.applyMakaoPlay(pl, st, rules, cur.id, mv.cardId, mv.demand); assert(r, 'bot chose an illegal card'); st = r.state; won = r.won; if (won) wins[cur.id] = (wins[cur.id] || 0) + 1; }
+      if (mv.type === 'play') { const r = E.applyMakaoPlay(pl, st, rules, cur.id, mv.cardIds, mv.demand); if (mv.cardIds.length > 1) multi++; assert(r, 'bot chose an illegal card'); st = r.state; won = r.won; if (won) wins[cur.id] = (wins[cur.id] || 0) + 1; }
       else { const nx = E.applyMakaoDraw(pl, st, rules, cur.id); assert(nx); st = nx; }
       const cardsAfter = Object.values(st.hands).reduce((s, h) => s + h.length, 0) + st.deck.length + st.discardPile.length;
       if (cardsAfter !== cardsBefore) { extra = 1; emergency++; assert(cardsAfter > cardsBefore); }
@@ -138,6 +174,6 @@ t('simulation: 4000 full games never stall or lose cards', () => {
     }
     maxSteps = Math.max(maxSteps, steps); totalSteps += steps;
   }
-  console.log(`     avg turns/game ${(totalSteps / 4000).toFixed(1)}, longest ${maxSteps}, catches ${catches}, emergency decks ${emergency}, wins by seat`, wins);
+  console.log(`     avg turns/game ${(totalSteps / 4000).toFixed(1)}, longest ${maxSteps}, catches ${catches}, multi-card plays ${multi}, emergency decks ${emergency}, wins by seat`, wins);
 });
 console.log(`\n${n} test groups passed`);

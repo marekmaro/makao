@@ -844,6 +844,114 @@
       100% { transform: scale(1) rotate(0); }
     }
 
+    /* ---------- karty: oczka, figury, łuk ręki ---------- */
+    .pip-field {
+      position: relative;
+      width: 68%;
+      height: 74%;
+      flex-shrink: 0;
+    }
+    .pip {
+      position: absolute;
+      line-height: 1;
+      font-weight: 400;
+      white-space: nowrap;
+    }
+    .face-card {
+      width: 52px;
+      height: 74px;
+      border-radius: 9px;
+      border: 1.5px solid;
+      padding: 4px;
+      display: flex;
+      box-shadow: inset 0 1px 0 rgba(255,255,255,0.9);
+    }
+    .face-card.face-small {
+      width: 30px;
+      height: 44px;
+      border-radius: 6px;
+      padding: 2px;
+    }
+    .face-frame {
+      flex: 1;
+      border: 1px solid;
+      border-radius: 6px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 3px;
+      background: repeating-linear-gradient(45deg, rgba(0,0,0,0.025) 0 4px, transparent 4px 8px);
+    }
+    .face-letter {
+      font-family: 'Playfair Display', Georgia, serif;
+      font-weight: 900;
+      font-size: 30px;
+      line-height: 0.9;
+      color: inherit;
+    }
+    .face-small .face-letter {
+      font-size: 14px;
+    }
+    .face-line {
+      width: 60%;
+      height: 1.5px;
+      border-radius: 2px;
+      opacity: 0.55;
+    }
+    .face-suit {
+      font-size: 14px;
+      line-height: 1;
+      color: inherit;
+    }
+    .face-small .face-suit {
+      font-size: 9px;
+    }
+
+    .hand-fit {
+      display: flex;
+      align-items: flex-end;
+      justify-content: flex-start;
+      overflow-x: auto;
+      padding: 26px 26px 10px;
+      scrollbar-width: none;
+    }
+    .hand-fit::-webkit-scrollbar {
+      display: none;
+    }
+    .fan-slot {
+      flex-shrink: 0;
+      transform-origin: 50% 110%;
+      transform: translateY(var(--lift, 0px)) rotate(var(--rot, 0deg));
+    }
+    .fan-slot + .fan-slot {
+      margin-left: var(--ov, 6px);
+    }
+    /* Auto-marginesy centrują rękę, gdy się mieści, a przy przepełnieniu zapadają się do zera —
+       dzięki temu lewe karty nie uciekają poza ekran i da się je przewinąć. */
+    .hand-fit > .fan-slot:first-child {
+      margin-left: auto;
+    }
+    .hand-fit > .fan-slot:last-child {
+      margin-right: auto;
+    }
+    .fan-slot .playing-card {
+      margin: 0;
+    }
+    .hand-fit .playing-card.playable {
+      box-shadow: 0 4px 0 #059669, 0 0 0 2px rgba(16, 185, 129, 0.35), 0 0 18px rgba(16, 185, 129, 0.35);
+    }
+    .hand-fit .playing-card.selected {
+      box-shadow: 0 5px 0 #D92D20, 0 0 0 2px rgba(255, 77, 61, 0.35), 0 8px 18px rgba(255, 77, 61, 0.35);
+    }
+    .playing-card.just-drawn {
+      animation: cardDeal 0.38s cubic-bezier(.22,1,.36,1);
+    }
+    @keyframes cardDeal {
+      0% { opacity: 0; transform: translateY(-26px) scale(0.92); }
+      100% { opacity: 1; transform: translateY(0) scale(1); }
+    }
+
     .pile-shadow-card {
       position: absolute;
       inset: 0;
@@ -1148,6 +1256,11 @@
     function roundResult(room, playerId) {
       const info = room.winnerInfo || {};
       const game = room.gameType;
+      // Wynik liczy się tylko dla prawdziwego gracza, nie dla miejsca zajętego przez bota.
+      const me = room.players.find(p => p.id === playerId);
+      if (!me || me.isBot) {
+        return { game, mice: 0, countsAsGame: false, duelMatch: false, duelWin: false, result: null };
+      }
       if (game === 'saboteur' && room.saboteur) {
         const ss = room.saboteur;
         const mice = (ss.mice && ss.mice[playerId]) || 0;
@@ -2919,6 +3032,71 @@
       );
     }
 
+    // Klasyczny układ oczek w polu 100x100 (współrzędne w %). Dolna połowa jest obrócona, jak na prawdziwej karcie.
+    const PIP_LAYOUT = {
+      2: [[50, 20], [50, 80]],
+      3: [[50, 18], [50, 50], [50, 82]],
+      4: [[30, 20], [70, 20], [30, 80], [70, 80]],
+      5: [[30, 20], [70, 20], [50, 50], [30, 80], [70, 80]],
+      6: [[30, 20], [70, 20], [30, 50], [70, 50], [30, 80], [70, 80]],
+      7: [[30, 20], [70, 20], [50, 35], [30, 50], [70, 50], [30, 80], [70, 80]],
+      8: [[30, 20], [70, 20], [50, 35], [30, 50], [70, 50], [50, 65], [30, 80], [70, 80]],
+      9: [[30, 16], [70, 16], [30, 38], [70, 38], [50, 50], [30, 62], [70, 62], [30, 84], [70, 84]],
+      10: [[30, 16], [70, 16], [50, 27], [30, 38], [70, 38], [30, 62], [70, 62], [50, 73], [30, 84], [70, 84]]
+    };
+
+    function PipField({ n, symbol, color, small }) {
+      const pts = PIP_LAYOUT[n] || PIP_LAYOUT[2];
+      const size = small ? 8 : n >= 9 ? 11 : n >= 7 ? 12 : n >= 4 ? 14 : 17;
+      return (
+        <div className="pip-field" style={{ color }}>
+          {pts.map(([x, y], i) => (
+            <span
+              key={i}
+              className="pip"
+              style={{
+                left: `${x}%`,
+                top: `${y}%`,
+                fontSize: size,
+                transform: `translate(-50%, -50%)${y > 50 ? ' rotate(180deg)' : ''}`
+              }}
+            >
+              {symbol}
+            </span>
+          ))}
+        </div>
+      );
+    }
+
+    // Ile miejsca na zachodzenie kart w ręce: karty łapią się w jednym łuku, ale nie wychodzą poza ekran.
+    function handOverlap(n) {
+      if (n <= 1) return 0;
+      const vw = typeof window !== 'undefined' ? Math.min(window.innerWidth, 640) : 390;
+      const cw = vw >= 640 ? 90 : 74;
+      const avail = vw - 64;
+      const ov = Math.floor((avail - n * cw) / (n - 1));
+      return Math.max(-30, Math.min(8, ov));
+    }
+
+    // Ręka jako łuk: każda karta to „slot” obrócony wokół dolnego środka.
+    function FanHand({ cards, renderCard }) {
+      const n = cards.length;
+      const step = n > 1 ? Math.min(4, 22 / (n - 1)) : 0;
+      const ov = handOverlap(n);
+      return (
+        <div className="hand-fit" style={{ '--ov': `${ov}px` }}>
+          {cards.map((card, i) => {
+            const d = i - (n - 1) / 2;
+            return (
+              <div key={card.id} className="fan-slot" style={{ '--rot': `${d * step}deg`, '--lift': `${Math.abs(d) * 2.2}px` }}>
+                {renderCard(card, i)}
+              </div>
+            );
+          })}
+        </div>
+      );
+    }
+
     function CardCenterArt({ card, small }) {
       const meta = SUIT_META[card.suit] || SUIT_META.spades;
       const color = meta.color;
@@ -2964,48 +3142,22 @@
       }
 
       if (['J', 'Q', 'K'].includes(card.rank)) {
-        const badgeIcon = card.rank === 'K' ? '👑' : card.rank === 'Q' ? '💎' : '⚔️';
         return (
-          <div
-            className={`flex flex-col items-center justify-center rounded-md border ${small ? 'w-7 h-9' : 'w-11 h-16'}`}
-            style={{
-              borderColor: `${color}35`,
-              background: card.suit === 'hearts' || card.suit === 'diamonds'
-                ? 'linear-gradient(180deg, #FFF5F5 0%, #FFFFFF 50%, #FFF5F5 100%)'
-                : 'linear-gradient(180deg, #F3F4F6 0%, #FFFFFF 50%, #F3F4F6 100%)'
-            }}
-          >
-            <span className={small ? 'text-[10px]' : 'text-sm'}>{badgeIcon}</span>
-            <span className={`font-serif-display font-black leading-none ${small ? 'text-xs' : 'text-lg'}`} style={{ color }}>
-              {card.rank}
-            </span>
-            <span className={small ? 'text-[9px] leading-none' : 'text-xs leading-none'} style={{ color }}>
-              {meta.symbol}
-            </span>
+          <div className={`face-card ${small ? 'face-small' : ''}`} style={{ color, borderColor: `${color}55`, background: card.suit === 'hearts' || card.suit === 'diamonds' ? 'linear-gradient(180deg, #FFF3F1 0%, #FFFFFF 55%, #FFF3F1 100%)' : 'linear-gradient(180deg, #F1F3F5 0%, #FFFFFF 55%, #F1F3F5 100%)' }}>
+            <div className="face-frame" style={{ borderColor: `${color}40` }}>
+              <span className="face-letter">{card.rank}</span>
+              <span className="face-line" style={{ background: color }} />
+              <span className="face-suit">{meta.symbol}</span>
+            </div>
           </div>
         );
       }
 
       const num = parseInt(card.rank, 10) || 2;
       if (small) {
-        return <span className="text-base leading-none" style={{ color }}>{meta.symbol}</span>;
+        return <PipField n={Math.min(num, 10)} symbol={meta.symbol} color={color} small />;
       }
-
-      const pipCount = Math.min(num, 10);
-      const gridCols = pipCount <= 3 ? 'grid-cols-1' : 'grid-cols-2';
-      return (
-        <div className={`grid ${gridCols} gap-x-2 gap-y-0.5 place-items-center px-2 py-1`}>
-          {Array.from({ length: pipCount }).map((_, idx) => (
-            <span
-              key={idx}
-              className={`${pipCount >= 8 ? 'text-[10px]' : pipCount >= 5 ? 'text-xs' : 'text-sm'} leading-none`}
-              style={{ color }}
-            >
-              {meta.symbol}
-            </span>
-          ))}
-        </div>
-      );
+      return <PipField n={Math.min(num, 10)} symbol={meta.symbol} color={color} />;
     }
 
     function PlayingCardView({ card, playable = false, selected = false, dimmed = false, faceDown = false, small = false, actionTag = null, className = '', onClick }) {
@@ -5274,8 +5426,9 @@
                         </span>
                       </div>
 
-                      <div className="hand-fit" style={{ '--n': myHand.length, '--gaps': Math.max(1, myHand.length - 1) }}>
-                        {myHand.map(card => {
+                      <FanHand
+                        cards={myHand}
+                        renderCard={(card) => {
                           const pickedIdx = picking ? makaoPick.indexOf(card.id) : -1;
                           // W trakcie wyboru podświetlamy karty tej samej figury, które można dołożyć.
                           const playable = picking
@@ -5283,7 +5436,6 @@
                             : isMyTurn && canPlayMakaoCard(card, ms, rules);
                           return (
                             <PlayingCardView
-                              key={card.id}
                               card={card}
                               playable={playable}
                               selected={pickedIdx !== -1}
@@ -5295,8 +5447,8 @@
                               onClick={() => handleMakaoCardClick(card)}
                             />
                           );
-                        })}
-                      </div>
+                        }}
+                      />
                     </div>
                   </div>
                 );
@@ -5584,27 +5736,21 @@
                           </button>
                         )}
                       </div>
-                      <div
-                        className="hand-fan"
-                        style={{ '--card-overlap': myHand.length > 9 ? '-24px' : '-12px' }}
-                      >
-                        {myHand.map(card => {
-                          const isSel = rummySelectedIds.includes(card.id);
-                          return (
-                            <PlayingCardView
-                              key={card.id}
-                              card={card}
-                              selected={isSel}
-                              playable={isMyTurn}
-                              onClick={() => {
-                                setRummySelectedIds(prev =>
-                                  prev.includes(card.id) ? prev.filter(id => id !== card.id) : [...prev, card.id]
-                                );
-                              }}
-                            />
-                          );
-                        })}
-                      </div>
+                      <FanHand
+                        cards={myHand}
+                        renderCard={(card) => (
+                          <PlayingCardView
+                            card={card}
+                            selected={rummySelectedIds.includes(card.id)}
+                            playable={isMyTurn}
+                            onClick={() => {
+                              setRummySelectedIds(prev =>
+                                prev.includes(card.id) ? prev.filter(id => id !== card.id) : [...prev, card.id]
+                              );
+                            }}
+                          />
+                        )}
+                      />
                     </div>
                   </div>
                 );

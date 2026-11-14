@@ -41,7 +41,7 @@ wszystkie pliki z tego repozytorium.
 
 ### Aktualizacja gry
 
-Po każdej zmianie plików podbij numer w `sw.js` (`const VERSION = 'paw-deck-v5.6.0'`). Telefony pobiorą
+Po każdej zmianie plików podbij numer w `sw.js` (`const VERSION = 'paw-deck-v5.7.0'`). Telefony pobiorą
 nową wersję przy następnym otwarciu aplikacji z internetem.
 
 ## Gra online i czat (Firebase)
@@ -125,6 +125,27 @@ Uproszczenia względem planszowego pierwowzoru: nie ma drzwi i kluczy, trolli, m
 - **Historia partii** zapisuje ostatnie 100 rund: grę, wynik, graczy, powód zakończenia i datę. Ostatnie widać w profilu.
 - **Kopia zapasowa:** „Eksportuj do pliku” zapisuje statystyki, historię, ustawienia i profil do pliku JSON.
   „Importuj z pliku” wczytuje go na innym urządzeniu i zastępuje dane obecne.
+
+## Konto Google i synchronizacja
+
+W profilu → **Zaloguj przez Google** statystyki, historia i ustawienia zapisują się w Firestore w dokumencie `users/{uid}`.
+Żeby to działało, w Firebase → Firestore → Rules dodaj regułę obok tej dla pokojów (całość powinna wyglądać tak):
+
+```
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    match /artifacts/{appId}/public/data/rooms/{room=**} {
+      allow read, write: if request.auth != null;
+    }
+    match /users/{uid} {
+      allow read, write: if request.auth != null && request.auth.uid == uid;
+    }
+  }
+}
+```
+
+Konto Google musi być włączone w Authentication → Sign-in method → Google.
 
 ## Znane ograniczenia
 

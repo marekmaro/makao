@@ -903,6 +903,32 @@
       background: #FEF3C7;
       color: #92400E;
     }
+    .seats-7, .seats-8, .seats-9, .seats-10 {
+      grid-template-columns: repeat(5, minmax(0, 1fr));
+      gap: 6px;
+    }
+    .seats-7 .seat, .seats-8 .seat, .seats-9 .seat, .seats-10 .seat {
+      padding: 5px 2px 4px;
+      border-radius: 16px;
+      gap: 1px;
+    }
+    .seats-7 .seat-avatar, .seats-8 .seat-avatar, .seats-9 .seat-avatar, .seats-10 .seat-avatar {
+      height: 32px;
+    }
+    .seats-7 .seat-avatar > *:first-child, .seats-8 .seat-avatar > *:first-child, .seats-9 .seat-avatar > *:first-child, .seats-10 .seat-avatar > *:first-child {
+      transform: scale(0.7);
+    }
+    .seats-7 .seat-name, .seats-8 .seat-name, .seats-9 .seat-name, .seats-10 .seat-name {
+      font-size: 10px;
+    }
+    .seats-7 .seat-cards, .seats-8 .seat-cards, .seats-9 .seat-cards, .seats-10 .seat-cards {
+      height: 18px;
+    }
+    .seats-7 .seat-count, .seats-8 .seat-count, .seats-9 .seat-count, .seats-10 .seat-count {
+      font-size: 12px;
+      min-width: 18px;
+      height: 18px;
+    }
     .seats-4 .seat, .seats-5 .seat, .seats-6 .seat {
       padding: 6px 4px 5px;
       gap: 2px;
@@ -1812,6 +1838,11 @@
       return { ok: true };
     }
 
+    // Ile osób zmieści się przy stole: Makao do 10 (więcej talii), pozostałe gry do 6.
+    function tableCap(gameType) {
+      return gameType === 'makao' ? 10 : 6;
+    }
+
     const AVATAR_FRAMES = {
       emerald: { name: 'Szmaragd', color: '#0F3D36' },
       coral: { name: 'Koral', color: '#E05A47' },
@@ -2167,10 +2198,10 @@
       warKings: true,           // Król ♥: następny +5, Król ♠: poprzedni +5
       queenAll: true,           // Dama na wszystko, wszystko na Damę
       queenSpadesShield: false, // wariant: Dama ♠ kasuje karę dobierania
-      useJokers: false,         // wariant: Jokery (+5, pasują na wszystko)
+      useJokers: true,          // joker przyjmuje wartość wybraną przy zagraniu
       catchMakao: true,         // brak okrzyku „MAKAO!” -> rywal mówi „STOP MAKAO!” = +5 kart
       multiPlay: true,          // kilka kart tej samej figury w jednym ruchu
-      deckMode: 'auto',         // 1 talia, od 4 graczy 2 talie
+      deckMode: 'auto',         // talie: 1 na 2–3 graczy, potem +1 na każde 3 osoby
       initialHandSize: 5,
       turnTime: 30              // sekundy na ruch w grze online (0 = bez limitu)
     };
@@ -2225,7 +2256,14 @@
       return shuffleArray(deck);
     }
 
-    // --- MAKAO LOGIC (czyste funkcje: stan wejściowy -> nowy stan) ---
+    // --- MAKAO (czyste funkcje: stan wejściowy -> nowy stan) ---
+    // Zasady: karty łączą się w ciągi (ta sama figura albo sąsiednia figura w tym samym kolorze),
+    // joker przyjmuje wybraną wartość, karty funkcyjne (2, 3, 4, J, A, Q, K♥, K♠) mają skutki.
+    const MAKAO_ORDER = ['2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K', 'A'];
+    // Liczba tur, przez które żądanie jest aktywne (licząc tury po zagraniu): as – tylko następny gracz,
+    // walet – cała kolejka, łącznie z graczem, który zagrał waleta.
+    const MAKAO_SUIT_DEMAND_TURNS = 2;
+
     function plCards(n) {
       const d = n % 10;
       const h = n % 100;
@@ -2235,32 +2273,41 @@
     }
 
     function makaoCardLabel(card) {
-      return card.rank === 'JOKER' ? 'Jokera ★' : `${card.rank}${SUIT_META[card.suit]?.symbol || ''}`;
+      const sym = SUIT_META[card.suit]?.symbol || '';
+      const base = card.rank === 'JOKER' ? 'Joker★' : `${card.rank}${sym}`;
+      return card.wild ? `${base}` : base;
     }
 
     function isWarKing(card, rules) {
       return Boolean(rules.warKings) && card.rank === 'K' && (card.suit === 'hearts' || card.suit === 'spades');
     }
 
-    // Karty „bojowe” — nakładają karę dobierania.
+    // Kara dobierania, jaką niesie karta (dwójka 2, trójka 3, króle bitne 5).
+    function attackValue(card, rules) {
+      if (card.rank === '2') return 2;
+      if (card.rank === '3') return 3;
+      if (isWarKing(card, rules)) return 5;
+      return 0;
+    }
+
+    // Karta funkcyjna: jej zagranie ma skutek. Nieznany joker też jest funkcyjny (dopóki nie ma wartości).
+    function isFunctional(card, rules) {
+      return ['2', '3', '4', 'J', 'A', 'Q', 'JOKER'].includes(card.rank) || isWarKing(card, rules);
+    }
+
     function isMakaoAttack(card, rules) {
-      return card.rank === '2' || card.rank === '3' || card.rank === 'JOKER' || isWarKing(card, rules);
+      return attackValue(card, rules) > 0;
     }
 
     function isMakaoCardAction(card, rules) {
-      if (!card) return false;
-      if (isMakaoAttack(card, rules)) return true;
-      if (['J', 'A'].includes(card.rank)) return true;
-      if (card.rank === '4' && rules.skipFour) return true;
-      if (card.rank === 'Q' && (rules.queenAll || (rules.queenSpadesShield && card.suit === 'spades'))) return true;
-      return false;
+      return isFunctional(card, rules);
     }
 
-    // Krótka etykieta funkcji karty (plakietka na karcie w ręce).
+    // Etykieta funkcji karty (plakietka na karcie w ręce).
     function makaoActionTag(card, rules) {
+      if (card.rank === 'JOKER') return '★';
       if (card.rank === '2') return '+2';
       if (card.rank === '3') return '+3';
-      if (card.rank === 'JOKER') return '+5';
       if (card.rank === '4' && rules.skipFour) return 'STOP';
       if (card.rank === 'J') return 'ŻĄDA';
       if (card.rank === 'A') return 'KOLOR';
@@ -2269,49 +2316,82 @@
       return null;
     }
 
+    // Dwie karty mogą stać obok siebie w ciągu: ta sama figura, albo sąsiednia figura w tym samym kolorze.
+    // „Dama na wszystko” pozwala połączyć damę z każdą kartą.
+    function makaoLinked(a, b, rules) {
+      if (!a || !b || a.rank === 'JOKER' || b.rank === 'JOKER') return false;
+      if (rules.queenAll && (a.rank === 'Q' || b.rank === 'Q')) return true;
+      if (a.rank === b.rank) return true;
+      const ia = MAKAO_ORDER.indexOf(a.rank);
+      const ib = MAKAO_ORDER.indexOf(b.rank);
+      return a.suit === b.suit && Math.abs(ia - ib) === 1;
+    }
+
+    function chainValid(cards, rules) {
+      if (!cards || cards.length === 0) return false;
+      for (let i = 1; i < cards.length; i++) {
+        if (!makaoLinked(cards[i - 1], cards[i], rules)) return false;
+      }
+      return true;
+    }
+
+    // Wartości, jakie może przyjąć joker: dla pierwszej karty – te, które pasują do stołu;
+    // dla kolejnej – te, które łączą się z poprzednią kartą ciągu.
+    function jokerIdentities(joker, state, rules, prefixCards = []) {
+      const out = [];
+      SUITS.forEach(suit => RANKS.forEach(rank => {
+        const cand = { id: joker.id, rank, suit, wild: true };
+        if (prefixCards.length === 0) {
+          if (!canPlayMakaoCard(cand, state, rules)) return;
+        } else if (!makaoLinked(prefixCards[prefixCards.length - 1], cand, rules)) {
+          return;
+        }
+        out.push(cand);
+      }));
+      return out;
+    }
+
+    // Czy karta (z już zadeklarowaną wartością, jeśli to joker) może otworzyć ruch na tym stanie.
     function canPlayMakaoCard(card, state, rules) {
       if (!card || !state || !state.discardPile || state.discardPile.length === 0) return false;
-      // Po dobraniu karty można zagrać tylko tę dobraną.
+      if (card.rank === 'JOKER' && !card.wild) {
+        return jokerIdentities(card, state, rules, []).length > 0;
+      }
+      // Po dobraniu ratującej karty ciąg musi się od niej zacząć.
       if (state.drawnCardId && card.id !== state.drawnCardId) return false;
-      const topCard = state.discardPile[state.discardPile.length - 1];
+      const top = state.discardPile[state.discardPile.length - 1];
 
-      // 1) Trwa atak (kara dobierania) — można się tylko bronić.
+      // 1) Trwa kara dobierania: można tylko się bronić.
       if (state.pendingDraw > 0) {
         if (rules.queenSpadesShield && card.rank === 'Q' && card.suit === 'spades') return true;
-        if (!rules.stackDraw) return false;
-        if (!isMakaoAttack(card, rules)) return false;
-        // Klasycznie: dwójka i trójka przebijają się nawzajem bez względu na kolor; króle bojowe — królami.
-        if (card.rank === 'JOKER' || topCard.rank === 'JOKER') return true;
-        if (isWarKing(topCard, rules)) return isWarKing(card, rules);
-        return card.rank === '2' || card.rank === '3';
+        if (!rules.stackDraw || !isMakaoAttack(card, rules)) return false;
+        if (isWarKing(top, rules)) return isWarKing(card, rules) || card.rank === '2' || card.rank === '3';
+        if (top.rank === '2' || top.rank === '3') return card.rank === '2' || card.rank === '3';
+        return false;
       }
 
-      // 2) Trwa czekanie po czwórce — przebija tylko kolejna czwórka.
-      if (state.pendingSkip > 0) {
-        return Boolean(rules.skipFour) && card.rank === '4';
-      }
+      // 2) Trwa postój po czwórce: tylko kolejna czwórka.
+      if (state.pendingSkip > 0) return Boolean(rules.skipFour) && card.rank === '4';
 
-      if (card.rank === 'JOKER') return true;
-
-      // 3) Żądanie waleta: tylko żądana figura albo kolejny walet.
-      if (state.demandedRank) {
+      // 3) Żądanie waleta: tylko żądana figura albo kolejny walet (dama nie działa na żądanie).
+      if (state.demandedRank && state.demandRankTurns > 0) {
         return card.rank === state.demandedRank || card.rank === 'J';
       }
 
-      // 4) Żądanie asa: tylko żądany kolor, as albo (wariant) dama.
-      if (state.demandedSuit) {
+      // 4) Żądanie koloru z asa: tylko żądany kolor albo as (dama, jeśli obowiązuje dama na wszystko).
+      if (state.demandedSuit && state.demandSuitTurns > 0) {
+        if (card.rank === 'A') return true;
         if (rules.queenAll && card.rank === 'Q') return true;
-        return card.suit === state.demandedSuit || card.rank === 'A';
+        return card.suit === state.demandedSuit;
       }
 
-      if (rules.queenAll && (card.rank === 'Q' || topCard.rank === 'Q')) return true;
-      if (topCard.rank === 'JOKER') return true;
-      return card.suit === topCard.suit || card.rank === topCard.rank;
+      if (rules.queenAll && (card.rank === 'Q' || top.rank === 'Q')) return true;
+      return card.suit === top.suit || card.rank === top.rank;
     }
 
     function makaoDeckCount(rules, playerCount) {
-      if (rules.deckMode === 'auto') return playerCount >= 4 ? 2 : 1;
-      return Math.max(1, Math.min(2, Number(rules.deckMode) || 1));
+      if (rules.deckMode === 'auto') return Math.max(1, Math.ceil(playerCount / 3));
+      return Math.max(1, Math.min(4, Number(rules.deckMode) || 1));
     }
 
     function initMakaoState(players, rules) {
@@ -2319,15 +2399,20 @@
       const deck = createStandardDeck({ includeJokers: rules.useJokers, numDecks: effectiveDecks });
       const hands = {};
       const handSize = Math.max(4, Math.min(7, Number(rules.initialHandSize) || 5));
-
       players.forEach(p => {
         hands[p.id] = deck.splice(0, handSize);
       });
 
-      // Pierwsza karta na stosie musi być „zwykła”.
-      let startIdx = deck.findIndex(c => !isMakaoCardAction(c, rules) && c.rank !== 'Q' && c.rank !== 'K' && c.rank !== '4');
-      if (startIdx === -1) startIdx = 0;
-      const [firstCard] = deck.splice(startIdx, 1);
+      // Pierwsza karta na stole: odkrywamy karty, aż trafi się niefunkcyjna; funkcyjne wracają do talii.
+      const returned = [];
+      let first = null;
+      while (deck.length > 0) {
+        const c = deck.pop();
+        if (isFunctional(c, rules)) returned.push(c);
+        else { first = c; break; }
+      }
+      if (returned.length > 0) deck.unshift(...shuffleArray(returned));
+      if (!first) first = deck.pop() || { id: uid('start'), rank: '7', suit: 'hearts' };
 
       const skipTurns = {};
       const saidMakao = {};
@@ -2338,15 +2423,16 @@
 
       return {
         deck,
-        discardPile: [firstCard],
+        discardPile: [first],
         hands,
         currentTurnIdx: 0,
         direction: 1,
         pendingDraw: 0,
         pendingSkip: 0,
         demandedSuit: null,
+        demandSuitTurns: 0,
         demandedRank: null,
-        demandTurnsLeft: 0,
+        demandRankTurns: 0,
         drawnCardId: null,
         skipTurns,
         saidMakao,
@@ -2363,12 +2449,11 @@
       for (let i = 0; i < count; i++) {
         if (deck.length === 0) {
           if (discardPile.length > 1) {
-            // Talia się skończyła: tasujemy stos (bez wierzchniej karty).
+            // Talia się skończyła: stos tasujemy, zostaje tylko wierzchnia karta.
             const top = discardPile[discardPile.length - 1];
             deck = shuffleArray(discardPile.slice(0, -1));
             discardPile = [top];
           } else {
-            // Wszystkie karty są w rękach — awaryjnie dokładamy świeżą talię.
             deck = createStandardDeck({ includeJokers: rules.useJokers, numDecks: 1 });
           }
         }
@@ -2384,7 +2469,7 @@
       let nextIdx = (state.currentTurnIdx + step + n * 10) % n;
       const nextSkipTurns = { ...state.skipTurns };
 
-      // Gracze, którzy odsiadują kolejki po czwórkach, są pomijani.
+      // Gracze odsiadujący kolejki po czwórkach są pomijani.
       let guard = 0;
       while (nextSkipTurns[players[nextIdx].id] > 0 && guard < n * 4) {
         nextSkipTurns[players[nextIdx].id] -= 1;
@@ -2392,93 +2477,119 @@
         guard++;
       }
 
-      let demandedRank = state.demandedRank;
-      let demandTurnsLeft = state.demandTurnsLeft || 0;
-      if (demandedRank && demandTurnsLeft > 0) {
-        demandTurnsLeft -= 1;
-        if (demandTurnsLeft <= 0) demandedRank = null;
+      // Żądania wygasają po swoich turach.
+      let dRank = state.demandedRank;
+      let rankTurns = state.demandRankTurns || 0;
+      if (rankTurns > 0) {
+        rankTurns -= 1;
+        if (rankTurns <= 0) { dRank = null; rankTurns = 0; }
       }
-      if (!demandedRank) demandTurnsLeft = 0;
+      let dSuit = state.demandedSuit;
+      let suitTurns = state.demandSuitTurns || 0;
+      if (suitTurns > 0) {
+        suitTurns -= 1;
+        if (suitTurns <= 0) { dSuit = null; suitTurns = 0; }
+      }
 
       return {
         ...state,
         currentTurnIdx: nextIdx,
         skipTurns: nextSkipTurns,
-        demandedRank,
-        demandTurnsLeft,
+        demandedRank: dRank,
+        demandRankTurns: rankTurns,
+        demandedSuit: dSuit,
+        demandSuitTurns: suitTurns,
         drawnCardId: null,
         turnStartedAt: Date.now()
       };
     }
 
-    // Karty z ręki, które można dołożyć w tym samym ruchu do karty `card` (ta sama figura).
-    function makaoMates(hand, card, rules) {
-      if (!rules.multiPlay || !card) return [];
-      return (hand || []).filter(c => c.id !== card.id && c.rank === card.rank);
+    // Zamienia pozycje z ręki (id, dla jokera także wybraną wartość) na karty ciągu.
+    // Zwraca null, gdy któraś pozycja jest nieprawidłowa.
+    function resolveMakaoItems(hand, items) {
+      const list = Array.isArray(items) ? items : [items];
+      const seen = new Set();
+      const cards = [];
+      for (const it of list) {
+        const id = typeof it === 'string' ? it : it && it.id;
+        if (!id || seen.has(id)) return null;
+        seen.add(id);
+        const card = hand.find(c => c.id === id);
+        if (!card) return null;
+        if (card.rank === 'JOKER') {
+          const decl = typeof it === 'object' ? it : null;
+          if (!decl || !RANKS.includes(decl.rank) || !SUITS.includes(decl.suit)) return null;
+          cards.push({ ...card, rank: decl.rank, suit: decl.suit, wild: true });
+        } else {
+          cards.push(card);
+        }
+      }
+      return cards;
     }
 
-    // Zagranie jednej lub kilku kart tej samej figury (pierwsza musi pasować do stosu, ostatnia zostaje na wierzchu).
-    // Zwraca { state, won, actor } albo null, gdy ruch jest niedozwolony.
-    function applyMakaoPlay(players, ms, rules, actorId, cardIdOrIds, demandChoice = null) {
+    // Zagranie ciągu kart. items: id albo { id, rank, suit } dla jokera. Zwraca { state, won, actor } albo null.
+    function applyMakaoPlay(players, ms, rules, actorId, items, demandChoice = null) {
       const n = players.length;
       const actorIdx = players.findIndex(p => p.id === actorId);
       if (actorIdx === -1 || actorIdx !== ms.currentTurnIdx) return null;
       const hand = ms.hands[actorId] || [];
-      const ids = Array.isArray(cardIdOrIds) ? cardIdOrIds : [cardIdOrIds];
-      if (ids.length === 0 || new Set(ids).size !== ids.length) return null;
-      const cards = ids.map(id => hand.find(c => c.id === id));
-      if (cards.some(c => !c)) return null;
-      if (cards.length > 1 && (!rules.multiPlay || cards.some(c => c.rank !== cards[0].rank))) return null;
+      const cards = resolveMakaoItems(hand, items);
+      if (!cards || !chainValid(cards, rules)) return null;
       if (!canPlayMakaoCard(cards[0], ms, rules)) return null;
 
       const actor = players[actorIdx];
-      const first = cards[0];
-      const last = cards[cards.length - 1];
-      const played = new Set(ids);
+      const played = new Set(cards.map(c => c.id));
       const newHand = hand.filter(c => !played.has(c.id));
+
       let pendingDraw = ms.pendingDraw;
       let pendingSkip = ms.pendingSkip;
-      let demandedSuit = null;
-      // Żądanie waleta obowiązuje całą kolejkę — zagranie żądanej figury go nie kasuje.
-      let demandedRank = ms.demandedRank && first.rank === ms.demandedRank ? ms.demandedRank : null;
-      let demandTurnsLeft = demandedRank ? ms.demandTurnsLeft : 0;
       let customStep = null;
-      let note = '';
+      const notes = [];
 
-      if (first.rank === '2' || first.rank === '3') {
-        pendingDraw += Number(first.rank) * cards.length;
-        note = `kara +${pendingDraw}`;
-      } else if (first.rank === 'JOKER') {
-        pendingDraw += 5 * cards.length;
-        note = `kara +${pendingDraw}`;
-      } else if (cards.some(c => isWarKing(c, rules))) {
-        const warKings = cards.filter(c => isWarKing(c, rules));
-        pendingDraw += 5 * warKings.length;
-        // O tym, kto obrywa, decyduje ostatni położony król bojowy (pik = poprzedni gracz).
-        if (warKings[warKings.length - 1].suit === 'spades') {
-          customStep = -ms.direction;
-          note = n > 2 ? `poprzedni gracz: +${pendingDraw}` : `kara +${pendingDraw}`;
-        } else {
-          note = `kara +${pendingDraw}`;
-        }
-      } else if (first.rank === '4' && rules.skipFour) {
-        pendingSkip += cards.length;
-        note = pendingSkip === 1 ? 'następny czeka kolejkę' : `następny czeka ${pendingSkip} kolejki`;
-      } else if (first.rank === 'Q' && rules.queenSpadesShield && pendingDraw > 0 && cards.some(c => c.suit === 'spades')) {
+      // Tarcza damy pik kasuje karę, której dotyczy obrona.
+      if (pendingDraw > 0 && rules.queenSpadesShield && cards.some(c => c.rank === 'Q' && c.suit === 'spades')) {
         pendingDraw = 0;
-        note = 'tarcza — kara anulowana';
-      } else if (first.rank === 'A') {
+        notes.push('tarcza — kara anulowana');
+      }
+      // Kary sumują się: każda dwójka i trójka dokłada swoją wartość, każdy król bitny — pięć.
+      const attack = cards.reduce((sum, c) => sum + attackValue(c, rules), 0);
+      if (attack > 0) {
+        pendingDraw += attack;
+        notes.push(`kara +${pendingDraw}`);
+      }
+      // Król pik odsyła karę do poprzedniego gracza (w grze dwuosobowej to ten sam gracz).
+      if (cards.some(c => isWarKing(c, rules) && c.suit === 'spades')) {
+        customStep = -ms.direction;
+      }
+      // Czwórki: każda blokuje kolejkę, a bloki się sumują.
+      const fours = cards.filter(c => c.rank === '4').length;
+      if (fours > 0 && rules.skipFour) {
+        pendingSkip += fours;
+        notes.push(pendingSkip === 1 ? 'następny czeka kolejkę' : `następny czeka ${pendingSkip} kolejki`);
+      }
+
+      // Żądania: as zmienia kolor na następną turę, walet – figurę na całą kolejkę.
+      let demandedSuit = ms.demandedSuit;
+      let demandSuitTurns = ms.demandSuitTurns || 0;
+      let demandedRank = ms.demandedRank;
+      let demandRankTurns = ms.demandRankTurns || 0;
+      const aces = cards.filter(c => c.rank === 'A');
+      if (aces.length > 0) {
+        const last = aces[aces.length - 1];
         demandedSuit = SUITS.includes(demandChoice) ? demandChoice : last.suit;
-        note = `żąda: ${SUIT_META[demandedSuit].symbol} ${SUIT_META[demandedSuit].label}`;
-      } else if (first.rank === 'J') {
+        demandSuitTurns = MAKAO_SUIT_DEMAND_TURNS;
+        notes.push(`żąda koloru: ${SUIT_META[demandedSuit].symbol} ${SUIT_META[demandedSuit].label}`);
+      }
+      const jacks = cards.filter(c => c.rank === 'J');
+      if (jacks.length > 0) {
         if (MAKAO_DEMAND_RANKS.includes(demandChoice)) {
           demandedRank = demandChoice;
-          demandTurnsLeft = n + 1; // wszyscy po kolei, na końcu także żądający
-          note = `żąda: ${demandChoice}`;
+          demandRankTurns = n + 1;
+          notes.push(`żąda: ${demandChoice}`);
         } else {
           demandedRank = null;
-          demandTurnsLeft = 0;
-          note = 'bez żądania';
+          demandRankTurns = 0;
+          notes.push('bez żądania');
         }
       }
 
@@ -2486,7 +2597,7 @@
         ...ms.saidMakao,
         [actorId]: newHand.length === 1 && (Boolean(actor.isBot) || Boolean(ms.saidMakao[actorId]))
       };
-      const eventText = `${actor.name}: ${cards.map(makaoCardLabel).join(' ')}${note ? ` — ${note}` : ''}`;
+      const text = `${actor.name}: ${cards.map(makaoCardLabel).join(' ')}${notes.length ? ` — ${notes.join(', ')}` : ''}`;
 
       const base = {
         ...ms,
@@ -2495,11 +2606,12 @@
         pendingDraw,
         pendingSkip,
         demandedSuit,
+        demandSuitTurns,
         demandedRank,
-        demandTurnsLeft,
+        demandRankTurns,
         drawnCardId: null,
         saidMakao,
-        lastEvent: eventText
+        lastEvent: text
       };
 
       if (newHand.length === 0) {
@@ -2508,13 +2620,12 @@
       return { state: advanceMakaoTurn(players, base, customStep), won: false, actor };
     }
 
-    // Przycisk talii: dobranie karty / wzięcie kary / odczekanie kolejki / pas po dobraniu.
+    // Przycisk talii: dobranie karty, wzięcie kary, odsiedzenie kolejki albo pas po dobraniu.
     function applyMakaoDraw(players, ms, rules, actorId) {
       const actorIdx = players.findIndex(p => p.id === actorId);
       if (actorIdx === -1 || actorIdx !== ms.currentTurnIdx) return null;
       const actor = players[actorIdx];
 
-      // Karta już dobrana i niezagrana -> pas.
       if (ms.drawnCardId) {
         return advanceMakaoTurn(players, { ...ms, lastEvent: `${actor.name} dobiera kartę i pasuje.` });
       }
@@ -2543,7 +2654,7 @@
           : `${actor.name} dobiera kartę.`
       };
 
-      // Dobrana karta pasuje? Tura zostaje — można ją od razu zagrać albo spasować.
+      // Dobrana karta pasuje do stołu? Można ją od razu zagrać (sam, albo z kartami, które się z nią łączą).
       if (!penalty && drawn.length === 1 && canPlayMakaoCard(drawn[0], base, rules)) {
         return { ...base, drawnCardId: drawn[0].id };
       }
@@ -2560,7 +2671,7 @@
       };
     }
 
-    // Gracze z jedną kartą, którzy nie krzyknęli „MAKAO!” — można ich przyłapać.
+    // Gracze z jedną kartą, którzy nie krzyknęli „MAKAO!” — rywal może powiedzieć „STOP MAKAO”.
     function makaoCatchTargets(players, ms, rules, catcherId) {
       if (!rules.catchMakao) return [];
       return players.filter(p => p.id !== catcherId && (ms.hands[p.id] || []).length === 1 && !ms.saidMakao[p.id]);
@@ -2580,73 +2691,71 @@
       };
     }
 
-    // Prosty, ale rozsądny bot: trzyma karty specjalne na groźne sytuacje.
+    // Bot: szuka najdłuższego ciągu do zagrania (zachłannie, od każdej możliwej karty startowej).
     function chooseMakaoBotMove(players, ms, rules, botId) {
       const hand = ms.hands[botId] || [];
-      const playable = hand.filter(c => canPlayMakaoCard(c, ms, rules));
-      if (playable.length === 0) return { type: 'draw' };
-
-      const n = players.length;
-      const myIdx = players.findIndex(p => p.id === botId);
-      const nextPlayer = players[(myIdx + ms.direction + n * 10) % n];
-      const prevPlayer = players[(myIdx - ms.direction + n * 10) % n];
-      const nextCount = (ms.hands[nextPlayer.id] || []).length;
-      const prevCount = (ms.hands[prevPlayer.id] || []).length;
-      const suitCount = {};
-      const rankCount = {};
+      const starts = [];
       hand.forEach(c => {
-        suitCount[c.suit] = (suitCount[c.suit] || 0) + 1;
-        rankCount[c.rank] = (rankCount[c.rank] || 0) + 1;
+        if (ms.drawnCardId && c.id !== ms.drawnCardId) return;
+        if (c.rank === 'JOKER') {
+          // Joker startowy: wybieramy wartość, która najczęściej występuje w ręce.
+          const freq = {};
+          hand.forEach(o => { if (o.rank !== 'JOKER') freq[o.rank + o.suit] = (freq[o.rank + o.suit] || 0) + 1; });
+          jokerIdentities(c, ms, rules, []).forEach(id => starts.push({ ...id, _score: freq[id.rank + id.suit] || 0 }));
+        } else if (canPlayMakaoCard(c, ms, rules)) {
+          starts.push(c);
+        }
+      });
+      if (starts.length === 0) return { type: 'draw' };
+
+      const nonFunctionalBonus = c => (isFunctional(c, rules) ? 0 : 2);
+      let best = null;
+      starts.forEach(first => {
+        const chain = [first];
+        const used = new Set([first.id]);
+        while (true) {
+          const cur = chain[chain.length - 1];
+          let pick = null;
+          let pickScore = -Infinity;
+          hand.forEach(c => {
+            if (used.has(c.id)) return;
+            if (c.rank === 'JOKER') {
+              // Joker w środku ciągu: tylko wartość połączoną z poprzednią kartą i najkorzystniejszą.
+              const ids = jokerIdentities(c, ms, rules, chain);
+              ids.forEach(id => {
+                const score = 0.5 + id.rank.length * 0 - 1; // jokery zostawiamy na później
+                if (score > pickScore) { pickScore = score; pick = id; }
+              });
+              return;
+            }
+            if (!makaoLinked(cur, c, rules)) return;
+            const score = 3 + nonFunctionalBonus(c) + (c.rank === cur.rank ? 1 : 0);
+            if (score > pickScore) { pickScore = score; pick = c; }
+          });
+          if (!pick) break;
+          chain.push(pick);
+          used.add(pick.id);
+        }
+        const finishes = chain.length === hand.length ? 1000 : 0;
+        const value = finishes + chain.length * 10 + chain.reduce((s, c) => s + nonFunctionalBonus(c), 0)
+          - chain.reduce((s, c) => s + (c.rank === 'JOKER' || c.wild ? 4 : 0), 0);
+        if (!best || value > best.value) best = { chain, value };
       });
 
-      const score = (c) => {
-        let s;
-        if (isMakaoAttack(c, rules)) {
-          const victimCount = isWarKing(c, rules) && c.suit === 'spades' ? prevCount : nextCount;
-          s = victimCount <= 2 ? 30 : 4;
-        } else if (c.rank === '4' && rules.skipFour) {
-          s = nextCount <= 2 ? 26 : 6;
-        } else if (c.rank === 'A') {
-          s = 3;
-        } else if (c.rank === 'J') {
-          s = 5;
-        } else if (c.rank === 'Q' && rules.queenAll) {
-          s = 2;
-        } else {
-          s = 10;
-        }
-        // Pozbywaj się najpierw kolorów/figur, których masz najwięcej.
-        return s + (suitCount[c.suit] || 0) * 0.5 + (rankCount[c.rank] || 0) * 0.3;
-      };
-
-      // Ostatnie karty: graj cokolwiek, co przybliża do wygranej (dwie takie same = koniec partii).
-      let chosen = hand.length <= 2
-        ? (playable.find(c => makaoMates(hand, c, rules).length === hand.length - 1) || playable[0])
-        : [...playable].sort((a, b) => score(b) - score(a))[0];
-
-      // Dokładamy pozostałe karty tej samej figury: zwykłe zawsze, kary i czwórki — żeby mocniej uderzyć.
-      // Asy, walety, damy i króle bot oszczędza (chyba że to kończy partię).
-      let extra = makaoMates(hand, chosen, rules);
-      const finishing = extra.length === hand.length - 1;
-      if (!finishing && ['A', 'J', 'Q', 'K'].includes(chosen.rank)) extra = [];
-      // Na wierzchu zostawiamy kolor, którego bot ma najwięcej.
-      extra = extra.sort((a, b) => (suitCount[a.suit] || 0) - (suitCount[b.suit] || 0));
-      const cardIds = [chosen.id, ...extra.map(c => c.id)];
-      const top = extra.length ? extra[extra.length - 1] : chosen;
-
-      const gone = new Set(cardIds);
-      const rest = hand.filter(c => !gone.has(c.id));
+      const chain = best.chain;
+      const items = chain.map(c => (c.wild || c.rank === 'JOKER' ? { id: c.id, rank: c.rank, suit: c.suit } : c.id));
+      const rest = hand.filter(c => !chain.some(x => x.id === c.id));
       let demand = null;
-      if (chosen.rank === 'A') {
+      if (chain.some(c => c.rank === 'A')) {
         const counts = {};
-        rest.forEach(c => { if (c.suit !== 'joker') counts[c.suit] = (counts[c.suit] || 0) + 1; });
-        demand = Object.keys(counts).sort((a, b) => counts[b] - counts[a])[0] || top.suit;
-      } else if (chosen.rank === 'J') {
+        rest.forEach(c => { if (c.rank !== 'JOKER') counts[c.suit] = (counts[c.suit] || 0) + 1; });
+        demand = Object.keys(counts).sort((a, b) => counts[b] - counts[a])[0] || chain[chain.length - 1].suit;
+      } else if (chain.some(c => c.rank === 'J')) {
         const counts = {};
         rest.forEach(c => { if (MAKAO_DEMAND_RANKS.includes(c.rank)) counts[c.rank] = (counts[c.rank] || 0) + 1; });
         demand = Object.keys(counts).sort((a, b) => counts[b] - counts[a])[0] || null;
       }
-      return { type: 'play', cardId: chosen.id, cardIds, demand };
+      return { type: 'play', items, cardIds: chain.map(c => c.id), demand };
     }
 
     // --- KOCIA EKIPA VS PSY (SABOTEUR) LOGIC & DETAILED INSPECT INFO ---
@@ -4256,6 +4365,7 @@
       const [sabInspectInfo, setSabInspectInfo] = useState(null);
       const [sabHealFirst, setSabHealFirst] = useState(null); // pierwsza z dwóch kart odrzucanych, żeby zdjąć opatrunek
       const [demandModalCard, setDemandModalCard] = useState(null);
+      const [jokerPick, setJokerPick] = useState(null); // { card, options } — wybór wartości jokera
       const [makaoPick, setMakaoPick] = useState([]); // karty zaznaczone do wspólnego zagrania (kolejność = kolejność na stosie)
       const [rummySelectedIds, setRummySelectedIds] = useState([]);
       const [passPhoneNextPlayer, setPassPhoneNextPlayer] = useState(null);
@@ -4839,7 +4949,7 @@
               showToast('Przy tym stole trwa już partia — dołącz po jej zakończeniu', 'error');
               return;
             }
-            if (data.players.length >= 6) {
+            if (data.players.length >= tableCap(data.gameType)) {
               showToast('Stół jest pełny (maks. 6 graczy)', 'error');
               return;
             }
@@ -5033,10 +5143,10 @@
         if (nextPl && !nextPl.isBot && nextPl.id !== actorId) setPassPhoneNextPlayer(nextPl);
       };
 
-      const executeMakaoPlayCard = (actorId, cardId, demandChoice = null) => {
+      const executeMakaoPlayCard = (actorId, items, demandChoice = null) => {
         const curr = roomRef.current;
         if (!curr || curr.status !== 'playing' || !curr.makao) return;
-        const res = applyMakaoPlay(curr.players, curr.makao, curr.makaoRules, actorId, cardId, demandChoice);
+        const res = applyMakaoPlay(curr.players, curr.makao, curr.makaoRules, actorId, items, demandChoice);
         if (!res) {
           if (actorId === activePlayerId) {
             SoundFX.error();
@@ -5072,32 +5182,67 @@
 
       // Zagranie zaznaczonych kart; as i walet pytają najpierw o żądanie
       // (chyba że to ostatnie karty z ręki — wtedy żądanie nie ma znaczenia).
-      const playMakaoCards = (ids) => {
+      // Ciąg kart w trakcie budowania: makaoPick = [{ id }] albo [{ id, rank, suit }] dla jokera, w kolejności zagrywania.
+      const pickToItems = (picks) => picks.map(p => (p.rank ? { id: p.id, rank: p.rank, suit: p.suit } : p.id));
+
+      const playMakaoItems = (picks) => {
         const curr = roomRef.current;
-        if (!curr?.makao || ids.length === 0) return;
+        if (!curr?.makao || picks.length === 0) return;
         const hand = curr.makao.hands[activePlayerId] || [];
-        const first = hand.find(c => c.id === ids[0]);
-        if (!first) return;
+        const items = pickToItems(picks);
+        const cards = resolveMakaoItems(hand, items) || [];
         setMakaoPick([]);
-        if ((first.rank === 'A' || first.rank === 'J') && ids.length < hand.length) {
-          setDemandModalCard({ rank: first.rank, ids });
+        setJokerPick(null);
+        // Walet i as pytają o żądanie, ale tylko wtedy, gdy zostają inne karty w ręce.
+        const demandCard = [...cards].reverse().find(c => c.rank === 'A' || c.rank === 'J');
+        if (demandCard && hand.length > cards.length) {
+          setDemandModalCard({ rank: demandCard.rank, items });
           return;
         }
-        executeMakaoPlayCard(activePlayerId, ids, null);
+        executeMakaoPlayCard(activePlayerId, items, null);
       };
 
-      const lastTapRef = useRef({ id: null, at: 0 });
-      const handleMakaoCardClick = (card) => {
+      // Czy po tej karcie da się jeszcze dołożyć kartę z ręki?
+      const canExtendMakao = (declared, hand, exceptId) => hand.some(o =>
+        o.id !== exceptId && (o.rank === 'JOKER' || makaoLinked(declared, o, roomRef.current?.makaoRules || {}))
+      );
+
+      const addMakaoPick = (item) => {
         const curr = roomRef.current;
-        // Dwa szybkie dotknięcia tej samej, grywalnej karty = zagranie jednej karty bez wyboru.
-        const now = Date.now();
-        const doubleTap = lastTapRef.current.id === card.id && now - lastTapRef.current.at < 450;
-        lastTapRef.current = { id: card.id, at: now };
-        if (doubleTap && curr?.makao && curr.status === 'playing' && curr.players[curr.makao.currentTurnIdx]?.id === activePlayerId && canPlayMakaoCard(card, curr.makao, curr.makaoRules)) {
-          setMakaoPick([]);
-          playMakaoCards([card.id]);
+        if (!curr?.makao) return;
+        const rules = curr.makaoRules;
+        const hand = curr.makao.hands[activePlayerId] || [];
+        const next = [...makaoPick, item];
+        const cards = resolveMakaoItems(hand, pickToItems(next));
+        if (!cards || !chainValid(cards, rules)) {
+          SoundFX.error();
+          showToast('Tej karty nie da się dołożyć — łączy się z ostatnią figurą albo kolorem', 'error');
           return;
         }
+        SoundFX.inspect();
+        setMakaoPick(next);
+      };
+
+      const pickJokerAs = (joker, option) => {
+        const item = { id: joker.id, rank: option.rank, suit: option.suit };
+        const curr = roomRef.current;
+        if (!curr?.makao) return;
+        const hand = curr.makao.hands[activePlayerId] || [];
+        if (makaoPick.length === 0) {
+          const declared = { ...joker, rank: option.rank, suit: option.suit, wild: true };
+          if (!canExtendMakao(declared, hand, joker.id)) {
+            playMakaoItems([item]);
+            return;
+          }
+          setMakaoPick([item]);
+          SoundFX.inspect();
+          return;
+        }
+        addMakaoPick(item);
+      };
+
+      const handleMakaoCardClick = (card) => {
+        const curr = roomRef.current;
         if (!curr || curr.status !== 'playing' || !curr.makao) return;
         const ms = curr.makao;
         const rules = curr.makaoRules;
@@ -5107,40 +5252,48 @@
         }
         const hand = ms.hands[activePlayerId] || [];
 
-        // Trwa zaznaczanie kilku kart tej samej figury.
-        if (makaoPick.length > 0) {
-          const firstPicked = hand.find(c => c.id === makaoPick[0]);
-          if (makaoPick.includes(card.id)) {
-            // Odznaczenie pierwszej karty kasuje cały wybór, kolejnej — tylko ją.
-            setMakaoPick(card.id === makaoPick[0] ? [] : makaoPick.filter(id => id !== card.id));
-            SoundFX.draw();
-            return;
-          }
-          if (firstPicked && card.rank === firstPicked.rank) {
-            setMakaoPick([...makaoPick, card.id]);
-            SoundFX.inspect();
-            return;
-          }
-          setMakaoPick([]);
-        }
-
-        if (!canPlayMakaoCard(card, ms, rules)) {
-          SoundFX.error();
-          showToast(ms.drawnCardId ? 'Możesz zagrać tylko dobraną kartę albo spasować' : 'Ta karta teraz nie pasuje', 'error');
+        // Kliknięcie wybranej karty odznacza ją i wszystko, co po niej.
+        const idx = makaoPick.findIndex(p => p.id === card.id);
+        if (idx !== -1) {
+          setMakaoPick(makaoPick.slice(0, idx));
+          SoundFX.draw();
           return;
         }
-        // Masz więcej kart tej figury? Najpierw wybór, ile z nich idzie na stół.
-        if (makaoMates(hand, card, rules).length > 0) {
-          setMakaoPick([card.id]);
+
+        // Joker: najpierw wybór wartości spośród tych, które da się zagrać.
+        if (card.rank === 'JOKER') {
+          const prefix = makaoPick.length ? resolveMakaoItems(hand, pickToItems(makaoPick)) || [] : [];
+          const options = jokerIdentities(card, ms, rules, prefix).map(o => ({ rank: o.rank, suit: o.suit }));
+          if (options.length === 0) {
+            SoundFX.error();
+            showToast('Joker teraz nie ma czym się zastąpić', 'error');
+            return;
+          }
+          setJokerPick({ card, options });
+          return;
+        }
+
+        if (makaoPick.length === 0) {
+          if (!canPlayMakaoCard(card, ms, rules)) {
+            SoundFX.error();
+            showToast(ms.drawnCardId ? 'Po dobraniu zagraj dobraną kartę (z kartami, które się z nią łączą) albo spasuj' : 'Ta karta teraz nie pasuje', 'error');
+            return;
+          }
+          // Nic nie da się dołożyć — karta idzie od razu. Inaczej pokazujemy pasek ciągu.
+          if (!canExtendMakao(card, hand, card.id)) {
+            playMakaoItems([{ id: card.id }]);
+            return;
+          }
+          setMakaoPick([{ id: card.id }]);
           SoundFX.inspect();
           return;
         }
-        playMakaoCards([card.id]);
+        addMakaoPick({ id: card.id });
       };
 
       // Zaznaczenie kasujemy, gdy zmienia się tura albo stos.
       const makaoTurnKey = `${room?.makao?.currentTurnIdx}|${room?.makao?.discardPile?.length}|${room?.status}`;
-      useEffect(() => { setMakaoPick([]); }, [makaoTurnKey]);
+      useEffect(() => { setMakaoPick([]); setJokerPick(null); }, [makaoTurnKey]);
 
       const handleSayMakao = () => {
         const curr = roomRef.current;
@@ -5352,9 +5505,10 @@
           const playable = (gState.hands[turnPlayer.id] || []).filter(c => canPlayMakaoCard(c, gState, curr.makaoRules));
           if (playable.length > 0 && Math.random() < BOT_LEVELS[botLevel].mistake) {
             // Słabszy ruch: losowa grywalna karta, bez żądań.
-            move = { type: 'play', cardIds: [playable[Math.floor(Math.random() * playable.length)].id], demand: null };
+            const plain = playable.filter(c => c.rank !== 'JOKER');
+            if (plain.length > 0) move = { type: 'play', items: [plain[Math.floor(Math.random() * plain.length)].id], demand: null };
           }
-          if (move.type === 'play') executeMakaoPlayCard(turnPlayer.id, move.cardIds, move.demand);
+          if (move.type === 'play') executeMakaoPlayCard(turnPlayer.id, move.items, move.demand);
           else executeMakaoDrawOrPass(turnPlayer.id);
           return;
         }
@@ -5784,9 +5938,9 @@
               <section className="bento-card p-4 space-y-3">
                 <div className="flex items-center justify-between">
                   <h3 className="text-xs font-extrabold uppercase tracking-wider text-[#66736E]">
-                    Gracze przy stole ({room.players.length}/6)
+                    Gracze przy stole ({room.players.length}/{tableCap(room.gameType)})
                   </h3>
-                  {room.hostId === playerId && room.players.length < 6 && (
+                  {room.hostId === playerId && room.players.length < tableCap(room.gameType) && (
                     <button
                       onClick={() => {
                         SoundFX.draw();
@@ -5934,7 +6088,7 @@
               </div>
 
               {/* Miejsca przy stole: rywale w siatce (bez przewijania), z kółkiem, nickiem i liczbą kart */}
-              <div className={`seats seats-${Math.min(room.players.length, 6)}`}>
+              <div className={`seats seats-${Math.min(room.players.length, 10)}`}>
                 {room.players.map((p, idx) => {
                   const gState = room.gameType === 'makao' ? room.makao : room.gameType === 'saboteur' ? room.saboteur : room.rummy;
                   const isTurn = gState?.currentTurnIdx === idx && room.status === 'playing';
@@ -6012,13 +6166,12 @@
                 const drewCard = isMyTurn && Boolean(ms.drawnCardId);
                 const timerOn = room.isOnline && Number(rules.turnTime) > 0 && room.status === 'playing';
                 const timeLeft = Math.max(0, Number(rules.turnTime) - Math.floor((nowTick - (ms.turnStartedAt || nowTick)) / 1000));
-                const pickFirst = makaoPick.length > 0 ? myHand.find(c => c.id === makaoPick[0]) : null;
-                const picking = isMyTurn && Boolean(pickFirst);
-                const pickMatesLeft = picking ? myHand.filter(c => c.rank === pickFirst.rank && !makaoPick.includes(c.id)).length : 0;
-                // Okrzyk można zapowiedzieć z wyprzedzeniem: gdy po tym ruchu zostanie jedna karta.
+                const picking = isMyTurn && makaoPick.length > 0;
+                const pickCards = picking ? (resolveMakaoItems(myHand, pickToItems(makaoPick)) || []) : [];
+                const pickLast = pickCards[pickCards.length - 1] || null;
+                // MAKAO można zapowiedzieć, gdy po tym ruchu może zostać jedna karta.
                 const canDeclare = rules.catchMakao && !room.isPassAndPlay && room.status === 'playing' && !ms.saidMakao[activePlayerId] &&
-                  (myHand.length === 1 || (hasPlayable && myHand.length >= 2 &&
-                    myHand.some(c => canPlayMakaoCard(c, ms, rules) && myHand.length - 1 - makaoMates(myHand, c, rules).length <= 1)));
+                  (myHand.length === 1 || (myHand.length <= 3 && hasPlayable));
                 // Rywale z jedną kartą, którzy nie krzyknęli „MAKAO!” — można im powiedzieć STOP MAKAO.
                 const sleepers = room.status === 'playing' && !room.isPassAndPlay
                   ? makaoCatchTargets(room.players, ms, rules, activePlayerId)
@@ -6035,7 +6188,7 @@
                 const hint = !isMyTurn
                   ? `Ruch: ${turnPlayer?.name || '…'}`
                   : picking
-                  ? (pickMatesLeft > 0 ? `Możesz dołożyć kolejne ${pickFirst.rank} — ostatnia zostanie na wierzchu` : 'Zagraj wybrane karty')
+                  ? (pickLast ? `Dołóż kartę połączoną z ${pickLast.rank} albo zagraj wybrane` : 'Wybierz kartę')
                   : drewCard
                   ? 'Dobrana karta pasuje — zagraj ją albo spasuj'
                   : hasPlayable
@@ -6131,8 +6284,8 @@
                       <div className="flex items-center justify-center gap-2.5 pt-1">
                         {picking ? (
                           <>
-                            <button onClick={() => playMakaoCards(makaoPick)} className="tactile-btn btn-coral px-5 text-sm">
-                              {makaoPick.length === 1 ? 'Zagraj 1 kartę' : `Zagraj ${makaoPick.length} ${plCards(makaoPick.length)}`}
+                            <button onClick={() => playMakaoItems(makaoPick)} className="tactile-btn btn-coral px-5 text-sm">
+                              {makaoPick.length === 1 ? 'Zagraj 1 kartę' : `Zagraj ${makaoPick.length} ${makaoPick.length < 5 ? 'karty' : 'kart'}`}
                             </button>
                             <button onClick={() => setMakaoPick([])} className="tactile-btn btn-paper px-4 text-sm" aria-label="Anuluj wybór">
                               Anuluj
@@ -6172,10 +6325,10 @@
                       <FanHand
                         cards={myHand}
                         renderCard={(card) => {
-                          const pickedIdx = picking ? makaoPick.indexOf(card.id) : -1;
-                          // W trakcie wyboru podświetlamy karty tej samej figury, które można dołożyć.
+                          const pickedIdx = makaoPick.findIndex(p => p.id === card.id);
+                          // W trakcie budowania ciągu podświetlamy karty, które można dołożyć na koniec.
                           const playable = picking
-                            ? pickedIdx === -1 && card.rank === pickFirst.rank
+                            ? pickedIdx === -1 && (card.rank === 'JOKER' || (pickLast && makaoLinked(pickLast, card, rules) && chainValid([...pickCards, card], rules)))
                             : isMyTurn && canPlayMakaoCard(card, ms, rules);
                           return (
                             <PlayingCardView
@@ -6575,6 +6728,35 @@
             </div>
           )}
 
+          {/* Joker: wybór wartości, którą zastępuje (tylko wartości, które da się zagrać) */}
+          {jokerPick && (
+            <div className="sheet-backdrop" onClick={() => setJokerPick(null)}>
+              <div className="sheet-panel space-y-3" onClick={e => e.stopPropagation()}>
+                <div className="flex items-center justify-between">
+                  <h3 className="font-serif-display text-xl font-black text-[#141A18]">Joker — jaką kartą jest?</h3>
+                  <button onClick={() => setJokerPick(null)} className="icon-btn" aria-label="Zamknij">✕</button>
+                </div>
+                <p className="text-xs text-[#586560] font-semibold">Joker może być dowolną kartą. Pokazuję tylko te, które da się teraz zagrać.</p>
+                <div className="grid grid-cols-4 gap-1.5 max-h-[52dvh] overflow-y-auto custom-scroll">
+                  {jokerPick.options.map(o => (
+                    <button
+                      key={`${o.rank}${o.suit}`}
+                      onClick={() => {
+                        const j = jokerPick.card;
+                        setJokerPick(null);
+                        pickJokerAs(j, o);
+                      }}
+                      className="tactile-btn btn-paper py-2.5 text-sm font-black"
+                      style={{ color: SUIT_META[o.suit].color }}
+                    >
+                      {o.rank}{SUIT_META[o.suit].symbol}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </div>
+          )}
+
           {/* Makao: wybór żądania (as = kolor, walet = figura) */}
           {demandModalCard && (
             <div className="sheet-backdrop" onClick={() => setDemandModalCard(null)}>
@@ -6598,7 +6780,7 @@
                         onClick={() => {
                           const c = demandModalCard;
                           setDemandModalCard(null);
-                          executeMakaoPlayCard(activePlayerId, c.ids, s);
+                          executeMakaoPlayCard(activePlayerId, c.items, s);
                         }}
                         className="tactile-btn btn-paper py-3.5 text-base"
                         style={{ color: SUIT_META[s].color }}
@@ -6616,7 +6798,7 @@
                           onClick={() => {
                             const c = demandModalCard;
                             setDemandModalCard(null);
-                            executeMakaoPlayCard(activePlayerId, c.ids, r);
+                            executeMakaoPlayCard(activePlayerId, c.items, r);
                           }}
                           className="tactile-btn btn-paper py-3 font-serif-display text-xl font-black"
                         >
@@ -6628,7 +6810,7 @@
                       onClick={() => {
                         const c = demandModalCard;
                         setDemandModalCard(null);
-                        executeMakaoPlayCard(activePlayerId, c.ids, null);
+                        executeMakaoPlayCard(activePlayerId, c.items, null);
                       }}
                       className="tactile-btn btn-emerald w-full text-xs"
                     >
@@ -7009,7 +7191,7 @@
                           {rules.multiPlay && (
                             <div className="rule-row">
                               <span className="rule-chip">7 7</span>
-                              <span>Masz kilka kart tej samej figury? Połóż je <strong>w jednym ruchu</strong> — pierwsza musi pasować do stosu, ostatnia zostaje na wierzchu. Kary i postoje się sumują.</span>
+                              <span>Ciąg kart w jednym ruchu: karty tej samej figury (np. 7♥ 7♠ 7♣) albo <strong>sąsiednie figury w tym samym kolorze</strong> (5♠ 6♠ 7♠). Pierwsza musi pasować do stosu.</span>
                             </div>
                           )}
                           <div className="rule-row">
@@ -7051,7 +7233,7 @@
                           {rules.useJokers && (
                             <div className="rule-row">
                               <span className="rule-chip">★</span>
-                              <span>Joker pasuje na wszystko i każe dobrać 5 kart.</span>
+                              <span>Joker może być dowolną kartą: przy zagraniu wybierasz, którą. Łączy się z innymi jak ta karta.</span>
                             </div>
                           )}
                           {rules.catchMakao && (
@@ -7082,10 +7264,10 @@
                           ['skipFour', 'Czwórka = postój', 'Następny gracz traci kolejkę'],
                           ['warKings', 'Króle bojowe', 'Król ♥ i król ♠ dają +5 kart'],
                           ['queenAll', 'Dama na wszystko', 'I wszystko na damę'],
-                          ['multiPlay', 'Kilka kart naraz', 'Te same figury w jednym ruchu, np. 7♥ i 7♠'],
+                          ['multiPlay', 'Ciągi kart', 'Kilka kart w jednym ruchu, także sąsiednie w kolorze'],
                           ['catchMakao', 'MAKAO i STOP MAKAO', 'Brak okrzyku + „STOP MAKAO!” rywala = 5 kart'],
                           ['queenSpadesShield', 'Tarcza damy pik', 'Wariant: dama ♠ kasuje karę'],
-                          ['useJokers', 'Jokery w talii', 'Wariant: +5 kart, pasują na wszystko']
+                          ['useJokers', 'Jokery w talii', 'Joker zastępuje dowolną kartę']
                         ].map(([key, label, sub]) => (
                           <button
                             key={key}

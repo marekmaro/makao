@@ -41,7 +41,7 @@ wszystkie pliki z tego repozytorium.
 
 ### Aktualizacja gry
 
-Po każdej zmianie plików podbij numer w `sw.js` (`const VERSION = 'paw-deck-v5.8.0'`). Telefony pobiorą
+Po każdej zmianie plików podbij numer w `sw.js` (`const VERSION = 'paw-deck-v5.9.0'`). Telefony pobiorą
 nową wersję przy następnym otwarciu aplikacji z internetem.
 
 ## Gra online i czat (Firebase)
@@ -146,6 +146,21 @@ service cloud.firestore {
 ```
 
 Konto Google musi być włączone w Authentication → Sign-in method → Google.
+
+## Zasady Makao (wersja obecna)
+
+- **Ciąg kart w jednym ruchu:** karty tej samej figury (np. 7♥ 7♠ 7♣) albo sąsiednie figury w tym samym kolorze
+  (5♠ 6♠ 7♠ 7♥ 8♥ 8♣ 7♣). Pierwsza musi pasować do stołu, kolejne łączą się z poprzednią.
+- **Joker:** może być dowolną kartą. Przy zagraniu wybierasz wartość spośród tych, które da się zagrać.
+- **Obrona przed karą:** dwójka i trójka przebijają się nawzajem w dowolnym kolorze. Króla bitnego przebija król
+  bitny, na króla można też położyć dwójkę lub trójkę. Kary się sumują.
+- **Król pik** odsyła karę do poprzedniego gracza, **król kier** do następnego.
+- **Walet** żąda figury na całą kolejkę (także dla gracza, który go zagrał), **as** żąda koloru tylko na następną turę.
+- **Po dobraniu** pasującą kartę można od razu zagrać, także z kartami, które się z nią łączą.
+- **MAKAO:** kiedy zostaje Ci jedna karta, kliknij „MAKAO!”. Jeśli zapomnisz, rywal może powiedzieć „STOP MAKAO” i dobierasz 5 kart.
+- **Start:** pierwsza karta jest niefunkcyjna; funkcyjne odkryte przy starcie wracają do talii.
+- **Talie:** 1 na 2–3 graczy, po jednej więcej na każde kolejne 3 osoby. Stół mieści do 10 graczy.
+- **Sterowanie:** kliknij kartę, dołóż kolejne (pasek „Zagraj”), albo dwa razy kliknij kartę, żeby zagrać samą ją.
 
 ## Znane ograniczenia
 

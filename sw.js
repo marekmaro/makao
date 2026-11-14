@@ -1,6 +1,6 @@
-// PAW & DECK — service worker: dzięki niemu aplikacja instaluje się i działa bez internetu.
+// Asy & Wąsy — service worker: dzięki niemu aplikacja instaluje się i działa bez internetu.
 // Po każdej zmianie plików gry podbij numer wersji, żeby telefony pobrały nową wersję.
-const VERSION = 'paw-deck-v4.2.0';
+const VERSION = 'paw-deck-v5.0.0';
 const SHELL_CACHE = `${VERSION}-shell`;
 const CDN_CACHE = `${VERSION}-cdn`;
 

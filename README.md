@@ -1,4 +1,4 @@
-# PAW & DECK — gry karciane (PWA)
+# Asy & Wąsy — gry karciane (PWA)
 
 Makao, Kocia Ekipa vs Psy i Remik w jednej aplikacji. Trzy sposoby gry: z botem, we dwoje na jednym
 telefonie albo online ze znajomymi (z czatem przy stole).
@@ -41,7 +41,7 @@ wszystkie pliki z tego repozytorium.
 
 ### Aktualizacja gry
 
-Po każdej zmianie plików podbij numer w `sw.js` (`const VERSION = 'paw-deck-v4.2.0'`). Telefony pobiorą
+Po każdej zmianie plików podbij numer w `sw.js` (`const VERSION = 'paw-deck-v5.0.0'`). Telefony pobiorą
 nową wersję przy następnym otwarciu aplikacji z internetem.
 
 ## Gra online i czat (Firebase)
@@ -93,12 +93,28 @@ Dostęp do danych ograniczają reguły z punktu 3.
 Warianty do włączenia w „Zasady i warianty”: tarcza damy pik, jokery, 7 kart na start, limit czasu na ruch
 (online), wyłączenie dowolnej z reguł powyżej.
 
+## Kocia Ekipa we dwoje — Pojedynek o myszy
+
+Domyślny tryb dla 2 graczy, wzorowany na zasadach pojedynkowych wariantów gier o budowaniu tuneli:
+
+- Każdy kot ma **własny komin** (start). Nowy tunel musi pasować do sąsiadów i łączyć się z Twoim kominem.
+  Tunele obu graczy mogą się spotkać — wtedy korzystają z nich oboje.
+- Po prawej leży **5 zakrytych celów**: Złota Mysz (3 pkt), tłusta mysz (2), dwie myszki (po 1) i pusta pułapka.
+  Cel zdobywa kot, którego komin jest z nim połączony; przy połączeniu z oboma — ten, kto wykonał ruch.
+- W turze: dołóż tunel, zagraj akcję (Złam Pazur, Kocimiętka, Kłębek Chaosu, Mapa Węchu), wymień kartę
+  albo — mając złamany pazur — **odrzuć 2 karty**, żeby zdjąć opatrunek.
+- Runda kończy się po odkryciu wszystkich celów albo gdy skończą się karty. Mecz to **3 rundy**, wygrywa suma punktów;
+  rundy zaczynają na zmianę.
+
+Uproszczenia względem planszowego pierwowzoru: nie ma drzwi i kluczy, trolli, mostów ani złota na kartach tuneli.
+
 ## Znane ograniczenia
 
 - Remik jest uproszczony: pierwsze wyłożenie to jeden układ za min. 30 pkt, nie ma dokładania kart do
   wyłożonych układów ani podmiany jokerów. Gdy talia skończy się drugi raz, rundę wygrywa gracz
   z najmniejszą liczbą punktów w ręce.
-- Kocia Ekipa w pojedynku „Kot kontra Chytry Pies” sprzyja psu (bot-kot wygrywa ok. 1 na 4 partie z botem-psem).
+- Kocia Ekipa, wariant „Kot kontra Chytry Pies” (do wyboru zamiast Pojedynku) sprzyja psu: bot-kot wygrywa
+  ok. 1 na 3 partie z botem-psem.
 
 - Gra online ufa graczom: cały stan stołu (także karty rywali) jest w jednym dokumencie Firestore.
   Do gry ze znajomymi to wystarcza; do gry z obcymi potrzebny byłby serwer rozstrzygający ruchy.

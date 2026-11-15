@@ -41,7 +41,7 @@ wszystkie pliki z tego repozytorium.
 
 ### Aktualizacja gry
 
-Po każdej zmianie plików podbij numer w `sw.js` (`const VERSION = 'paw-deck-v5.9.0'`). Telefony pobiorą
+Po każdej zmianie plików podbij numer w `sw.js` (`const VERSION = 'paw-deck-v5.10.0'`). Telefony pobiorą
 nową wersję przy następnym otwarciu aplikacji z internetem.
 
 ## Gra online i czat (Firebase)
@@ -161,6 +161,12 @@ Konto Google musi być włączone w Authentication → Sign-in method → Google
 - **Start:** pierwsza karta jest niefunkcyjna; funkcyjne odkryte przy starcie wracają do talii.
 - **Talie:** 1 na 2–3 graczy, po jednej więcej na każde kolejne 3 osoby. Stół mieści do 10 graczy.
 - **Sterowanie:** kliknij kartę, dołóż kolejne (pasek „Zagraj”), albo dwa razy kliknij kartę, żeby zagrać samą ją.
+
+## Warianty Makao
+
+W ściądze zasad (przycisk „Zasady i warianty”) są gotowe warianty: Klasyczne, Piątka na wszystko, Tarcza damy pik,
+Po jednej karcie, Bez jokerów, Szybka gra (15 s na ruch online) i Bez okrzyku MAKAO. Każdy wariant ustawia zestaw reguł,
+a ręczne przełączniki można dalej zmieniać.
 
 ## Znane ograniczenia
 

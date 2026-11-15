@@ -1120,6 +1120,41 @@
       letter-spacing: 0.02em;
     }
 
+    /* ---------- dopracowanie kart i ręki ---------- */
+    .playing-card {
+      box-shadow: 0 3px 0 #C7C1B5, 0 8px 16px rgba(20, 23, 26, 0.16);
+    }
+    .playing-card .playing-card-inner {
+      background: linear-gradient(170deg, rgba(255,255,255,0.9) 0%, rgba(255,255,255,0) 38%);
+    }
+    .playing-card .font-serif-display {
+      letter-spacing: -0.02em;
+    }
+    .playing-card.card-back {
+      box-shadow: 0 3px 0 #072E28, 0 8px 16px rgba(7, 46, 40, 0.3);
+    }
+    .hand-fit {
+      padding-top: 30px;
+      padding-bottom: 14px;
+    }
+    .hand-fit .playing-card.playable {
+      transform: translateY(-14px);
+    }
+    .hand-sort-btn:focus-visible,
+    .seat:focus-visible,
+    .play-main:focus-visible,
+    .play-alt button:focus-visible {
+      outline: 2px solid #D99B26;
+      outline-offset: 2px;
+    }
+    .hand-sort-btn {
+      min-height: 30px;
+      transition: transform 0.12s ease, background 0.15s ease;
+    }
+    .hand-sort-btn:active {
+      transform: scale(0.96);
+    }
+
     /* ---------- karty: oczka, figury, łuk ręki ---------- */
     .pip-field {
       position: relative;
@@ -1610,16 +1645,10 @@
   <div id="root">
     <div class="boot-splash">
       <div class="boot-paw"><svg viewBox="0 0 64 64" width="100%" height="100%" aria-hidden="true">
-        <rect width="64" height="64" rx="18" fill="#0F7A5A"/>
-        <rect x="30" y="11" width="19" height="27" rx="5" fill="#E5573F" transform="rotate(14 40 24)"/>
-        <rect x="15" y="20" width="30" height="34" rx="7" fill="#FFFFFF"/>
-        <path d="M15.5 29L17 13L28.5 22Z" fill="#FFFFFF" stroke="#FFFFFF" stroke-width="2.4" stroke-linejoin="round"/>
-        <path d="M44.5 29L43 13L31.5 22Z" fill="#FFFFFF" stroke="#FFFFFF" stroke-width="2.4" stroke-linejoin="round"/>
-        <circle cx="24.5" cy="35" r="2.6" fill="#1B1F1D"/>
-        <circle cx="35.5" cy="35" r="2.6" fill="#1B1F1D"/>
-        <path d="M28.6 41h2.8l-1.4 1.9z" fill="#E5573F"/>
-        <path d="M28 44.6q1.5 1.8 3 0q1.5 1.8 3 0" stroke="#1B1F1D" stroke-width="1.3" fill="none" stroke-linecap="round"/>
-        <path d="M12 41h-4M12.5 45l-4 1.5M52 41h4M51.5 45l4 1.5" stroke="#FFFFFF" stroke-width="1.3" stroke-linecap="round" opacity=".85"/>
+        <rect width="64" height="64" rx="18" fill="#0B463C"/>
+        <rect x="18" y="10" width="28" height="42" rx="6" fill="#FFFDF8" transform="rotate(-8 32 31)"/>
+        <g transform="rotate(-8 32 31)" fill="#0B463C"><ellipse cx="32" cy="38" rx="6.2" ry="5"/><ellipse cx="24.6" cy="30" rx="2.6" ry="3.4"/><ellipse cx="29.8" cy="25" rx="2.6" ry="3.4"/><ellipse cx="34.6" cy="25" rx="2.6" ry="3.4"/><ellipse cx="39.4" cy="30" rx="2.6" ry="3.4"/></g>
+        <text x="22" y="19" font-family="Georgia, serif" font-weight="900" font-size="8" fill="#E84A3A" transform="rotate(-8 32 31)">A</text>
       </svg></div>
       <div class="boot-title">Asy<span class="amp">&amp;</span>Wąsy</div>
       <div class="boot-sub">Przygotowuję stół…</div>
@@ -2291,6 +2320,7 @@
       skipFour: true,           // 4 = następny gracz czeka kolejkę
       warKings: true,           // Król ♥: następny +5, Król ♠: poprzedni +5
       queenAll: true,           // Dama na wszystko, wszystko na Damę
+      fiveAll: false,           // wariant: Piątka na wszystko (zamiast damy)
       queenSpadesShield: false, // wariant: Dama ♠ kasuje karę dobierania
       useJokers: true,          // joker przyjmuje wartość wybraną przy zagraniu
       catchMakao: true,         // brak okrzyku „MAKAO!” -> rywal mówi „STOP MAKAO!” = +5 kart
@@ -2300,6 +2330,27 @@
       turnTime: 30              // sekundy na ruch w grze online (0 = bez limitu)
     };
     const MAKAO_RULES_STORAGE_KEY = 'paw_deck_makao_rules_v2';
+
+    // Figura „na wszystko”: dama (domyślnie) albo piątka w wariancie „Piątka na wszystko”.
+    function wildRank(rules) {
+      if (rules.fiveAll) return '5';
+      if (rules.queenAll) return 'Q';
+      return null;
+    }
+
+    // Gotowe warianty Makao: nazwa, opis i zmiany względem klasyki.
+    const MAKAO_VARIANTS = [
+      { id: 'classic', name: 'Klasyczne', desc: 'Polskie Makao: ciągi kart, dama na wszystko, króle bitne, dwójki i trójki się przebijają, czwórka blokuje, joker jako dowolna karta.', patch: { queenAll: true, fiveAll: false, queenSpadesShield: false, useJokers: true, multiPlay: true, catchMakao: true, turnTime: 30 } },
+      { id: 'five', name: 'Piątka na wszystko', desc: 'Zamiast damy działa piątka: na każdą kartę można położyć piątkę i na piątkę każdą kartę.', patch: { queenAll: false, fiveAll: true } },
+      { id: 'shield', name: 'Tarcza damy pik', desc: 'Dama pik kasuje całą karę dobierania, także przy rozbudowanych łańcuchach dwójek i trójek.', patch: { queenSpadesShield: true } },
+      { id: 'singles', name: 'Po jednej karcie', desc: 'Bez ciągów: w jednym ruchu zawsze tylko jedna karta. Dobra na pierwszą partię.', patch: { multiPlay: false } },
+      { id: 'nojokers', name: 'Bez jokerów', desc: 'Talia bez jokerów, czyli 52 karty na talię. Mniej zaskoczeń, więcej planowania.', patch: { useJokers: false } },
+      { id: 'fast', name: 'Szybka gra', desc: 'Online 15 sekund na ruch zamiast 30. Gracze wolniejsi dobierają automatycznie.', patch: { turnTime: 15 } },
+      { id: 'nomakao', name: 'Bez okrzyku MAKAO', desc: 'Nie ma STOP MAKAO ani kary za zapomnienie. Liczy się tylko pozbycie się kart.', patch: { catchMakao: false } }
+    ];
+    function variantMatches(rules, v) {
+      return Object.entries(v.patch).every(([k, val]) => rules[k] === val);
+    }
     const MAKAO_DEMAND_RANKS = ['5', '6', '7', '8', '9', '10'];
 
     function loadMakaoRules() {
@@ -2474,11 +2525,12 @@
       // 4) Żądanie koloru z asa: tylko żądany kolor albo as (dama, jeśli obowiązuje dama na wszystko).
       if (state.demandedSuit && state.demandSuitTurns > 0) {
         if (card.rank === 'A') return true;
-        if (rules.queenAll && card.rank === 'Q') return true;
+        if (wildRank(rules) === card.rank) return true;
         return card.suit === state.demandedSuit;
       }
 
-      if (rules.queenAll && (card.rank === 'Q' || top.rank === 'Q')) return true;
+      const wild = wildRank(rules);
+      if (wild && (card.rank === wild || top.rank === wild)) return true;
       return card.suit === top.suit || card.rank === top.rank;
     }
 
@@ -3854,16 +3906,10 @@
     // 4. UI COMPONENTS (AVATAR, CLASSIC WHITE PLAYING CARD, QR MODAL)
     // =========================================================================
     const BRAND_LOGO_SVG = `<svg viewBox="0 0 64 64" width="100%" height="100%" aria-hidden="true">
-        <rect width="64" height="64" rx="18" fill="#0F7A5A"/>
-        <rect x="30" y="11" width="19" height="27" rx="5" fill="#E5573F" transform="rotate(14 40 24)"/>
-        <rect x="15" y="20" width="30" height="34" rx="7" fill="#FFFFFF"/>
-        <path d="M15.5 29L17 13L28.5 22Z" fill="#FFFFFF" stroke="#FFFFFF" stroke-width="2.4" stroke-linejoin="round"/>
-        <path d="M44.5 29L43 13L31.5 22Z" fill="#FFFFFF" stroke="#FFFFFF" stroke-width="2.4" stroke-linejoin="round"/>
-        <circle cx="24.5" cy="35" r="2.6" fill="#1B1F1D"/>
-        <circle cx="35.5" cy="35" r="2.6" fill="#1B1F1D"/>
-        <path d="M28.6 41h2.8l-1.4 1.9z" fill="#E5573F"/>
-        <path d="M28 44.6q1.5 1.8 3 0q1.5 1.8 3 0" stroke="#1B1F1D" stroke-width="1.3" fill="none" stroke-linecap="round"/>
-        <path d="M12 41h-4M12.5 45l-4 1.5M52 41h4M51.5 45l4 1.5" stroke="#FFFFFF" stroke-width="1.3" stroke-linecap="round" opacity=".85"/>
+        <rect width="64" height="64" rx="18" fill="#0B463C"/>
+        <rect x="18" y="10" width="28" height="42" rx="6" fill="#FFFDF8" transform="rotate(-8 32 31)"/>
+        <g transform="rotate(-8 32 31)" fill="#0B463C"><ellipse cx="32" cy="38" rx="6.2" ry="5"/><ellipse cx="24.6" cy="30" rx="2.6" ry="3.4"/><ellipse cx="29.8" cy="25" rx="2.6" ry="3.4"/><ellipse cx="34.6" cy="25" rx="2.6" ry="3.4"/><ellipse cx="39.4" cy="30" rx="2.6" ry="3.4"/></g>
+        <text x="22" y="19" font-family="Georgia, serif" font-weight="900" font-size="8" fill="#E84A3A" transform="rotate(-8 32 31)">A</text>
       </svg>`;
 
     function BrandLogo({ size = 44 }) {
@@ -7415,6 +7461,35 @@
                               <span>Zostaje Ci jedna karta? Kliknij <strong>MAKAO!</strong> Jeśli zapomnisz, rywal kliknie <strong>STOP MAKAO!</strong> i dobierasz 5 kart.</span>
                             </div>
                           )}
+                        </div>
+                      </div>
+
+                      <div className="space-y-2">
+                        <span className="section-label">Gotowe warianty</span>
+                        <div className="space-y-1.5">
+                          {MAKAO_VARIANTS.map(v => {
+                            const active = variantMatches(rules, v);
+                            return (
+                              <button
+                                key={v.id}
+                                type="button"
+                                disabled={!canEdit}
+                                onClick={() => {
+                                  if (!canEdit) return;
+                                  if (room) commitRoomState(prev => ({ ...prev, makaoRules: { ...prev.makaoRules, ...v.patch } }));
+                                  setMakaoRules(prev => ({ ...prev, ...v.patch }));
+                                  SoundFX.draw();
+                                }}
+                                className={`w-full text-left p-3 rounded-2xl border ${active ? 'bg-[#0B463C] text-white border-[#0B463C]' : 'bg-white border-[#E2DDD2] text-[#141A18]'} ${canEdit ? '' : 'opacity-60'}`}
+                              >
+                                <span className="flex items-center justify-between gap-2">
+                                  <span className="text-sm font-extrabold">{v.name}</span>
+                                  {active && <span className="text-[10px] font-black uppercase tracking-wide">aktywny</span>}
+                                </span>
+                                <span className={`block text-[11px] font-semibold mt-0.5 leading-snug ${active ? 'text-[#CBE0DA]' : 'text-[#586560]'}`}>{v.desc}</span>
+                              </button>
+                            );
+                          })}
                         </div>
                       </div>
 

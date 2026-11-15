@@ -7,7 +7,7 @@ const a = html.indexOf("    const SUITS = ['hearts'");
 const b = html.indexOf('    // --- KOCIA EKIPA VS PSY (SABOTEUR) LOGIC');
 const names = ['SUITS', 'RANKS', 'SUIT_META', 'DEFAULT_MAKAO_RULES', 'createStandardDeck', 'canPlayMakaoCard', 'initMakaoState', 'applyMakaoPlay', 'applyMakaoDraw',
   'applyMakaoSayMakao', 'applyMakaoCatch', 'makaoCatchTargets', 'chooseMakaoBotMove', 'advanceMakaoTurn', 'makaoDeckCount', 'plCards', 'makaoLinked', 'chainValid',
-  'jokerIdentities', 'resolveMakaoItems', 'makaoLongestChain', 'isFunctional', 'attackValue', 'MAKAO_ORDER'];
+  'jokerIdentities', 'resolveMakaoItems', 'makaoLongestChain', 'wildRank', 'MAKAO_VARIANTS', 'isFunctional', 'attackValue', 'MAKAO_ORDER'];
 const E = new Function('localStorage', html.slice(a, b) + `\nreturn { ${names.join(', ')} };`)({ getItem: () => null, setItem() {} });
 const R = { ...E.DEFAULT_MAKAO_RULES };
 const P = n => Array.from({ length: n }, (_, i) => ({ id: 'p' + i, name: 'P' + i, isBot: i !== 0 }));
@@ -174,6 +174,21 @@ t('MAKAO button logic: only when a legal move can leave one card', () => {
   const st2 = base(pl2, c('5', 'spades'), { p0: [c('5', 'spades', 'a'), c('6', 'spades', 'b'), c('9', 'clubs', 'x')], p1: [c('5', 'clubs')] });
   assert.strictEqual(E.makaoLongestChain(st2, R, [c('5', 'spades', 'a'), c('6', 'spades', 'b'), c('9', 'clubs', 'x')]), 2, '5♠ and 6♠ make a chain of two');
   assert.strictEqual(E.makaoLongestChain(st2, R, [c('5', 'hearts', 'a'), c('6', 'spades', 'b')]), 1, '5♥ and 6♠ do not link');
+});
+
+t('variants: piątka na wszystko works like the queen rule; every preset is a valid rule set', () => {
+  const five = { ...R, queenAll: false, fiveAll: true };
+  const st = base(pl2, c('5', 'hearts'), {});
+  assert(E.canPlayMakaoCard(c('Q', 'clubs'), base(pl2, c('2', 'hearts'), {}), five) === false, 'queen is no longer wild');
+  assert(E.canPlayMakaoCard(c('K', 'clubs'), base(pl2, c('5', 'hearts'), {}), five), 'a five on top takes any card');
+  assert(E.canPlayMakaoCard(c('5', 'clubs'), base(pl2, c('K', 'hearts'), {}), five), 'any card takes a five');
+  assert.strictEqual(E.wildRank(R), 'Q'); assert.strictEqual(E.wildRank(five), '5');
+  for (const v of E.MAKAO_VARIANTS) {
+    const rules = { ...R, ...v.patch };
+    const pl = P(3);
+    const st = E.initMakaoState(pl, rules);
+    assert(st.discardPile.length === 1);
+  }
 });
 
 t('illegal moves are refused', () => {
